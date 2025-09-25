@@ -70,7 +70,7 @@ jobs:
 
       # 9. Сохраняем .bin как артефакт
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Blink-bin
           path: ./build/esp8266/esp8266.nodemcuv2/*.bin
