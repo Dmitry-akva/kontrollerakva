@@ -25,13 +25,13 @@ jobs:
           path: ./bin
           key: arduino-cli-Linux-v1.3.1
 
-      # 3. Устанавливаем Arduino CLI и ESP8266 ядро
+      # 3. Устанавливаем Arduino CLI и ESP8266 core (фиксированная версия)
       - name: Install Arduino CLI and ESP8266 core
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
           ./bin/arduino-cli core update-index
-          ./bin/arduino-cli core install esp8266:esp8266
+          ./bin/arduino-cli core install esp8266:esp8266@3.1.2
 
       # 4. Кэш платформы ESP8266
       - name: Cache ESP8266 platform
@@ -51,9 +51,9 @@ jobs:
       - name: Install project libraries
         run: |
           if [ -d ./libraries ]; then
-           for lib in ./libraries/*; do
-            ./bin/arduino-cli lib install "$lib"
-           done
+            for lib in ./libraries/*; do
+              ./bin/arduino-cli lib install "$lib"
+            done
           fi
 
       # 7. Очищаем папку build перед компиляцией
