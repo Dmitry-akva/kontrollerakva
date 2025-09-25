@@ -27,11 +27,11 @@ jobs:
       - name: Compile sketch for NodeMCU 1.0 ESP12-E
         run: |
           ./bin/arduino-cli compile \
-            --fqbn esp8266:esp8266:nodemcuv2 \
-            --build-properties build.flash_size=4M \
-            --build-properties build.f_cpu=80 \
-            --build-properties upload.maximum_size=1019000 \
-            ./src
+           --fqbn esp8266:esp8266:nodemcuv2 \
+           --build-property build.flash_size=4M \
+           --build-property build.f_cpu=80 \
+           --build-property upload.maximum_size=1019000 \
+           ./src
 
       # 4. Загружаем прошивку как артефакт
       - name: Upload binary artifact
