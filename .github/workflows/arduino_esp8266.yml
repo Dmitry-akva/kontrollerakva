@@ -1,10 +1,13 @@
-name: Build ESP8266 Blink and Save Artifacts
+name: Build Arduino Sketch with Libraries and Save Artifacts
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -14,49 +17,73 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # Кэш Arduino CLI
+      - name: Cache Arduino CLI
+        uses: actions/cache@v3
+        with:
+          path: ./bin
+          key: arduino-cli-Linux-v1.3.1
+
       - name: Install Arduino CLI
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           ./bin/arduino-cli version
 
-      - name: Configure Arduino CLI and install ESP8266
+      # Кэш платформ
+      - name: Cache ESP8266 platform
+        uses: actions/cache@v3
+        with:
+          path: ~/.arduino15/packages/esp8266
+          key: esp8266-core-Linux-v3.1.2
+
+      - name: Cache AVR platform
+        uses: actions/cache@v3
+        with:
+          path: ~/.arduino15/packages/arduino/hardware/avr
+          key: avr-core-Linux-v1.8.10
+
+      # Кэш библиотек
+      - name: Cache Arduino libraries
+        uses: actions/cache@v3
+        with:
+          path: ~/.arduino15/libraries
+          key: arduino-libraries-${{ hashFiles('**/*.ino') }}
+
+      # Настройка CLI и установка платформ
+      - name: Configure Arduino CLI and install platforms
         run: |
           ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
           ./bin/arduino-cli core update-index
           ./bin/arduino-cli core install esp8266:esp8266@3.1.2
+          ./bin/arduino-cli core install arduino:avr@1.8.10
 
-      - name: Compile Blink sketch
+      # Установка библиотек из репозитория (если есть)
+      - name: Install libraries
+        run: ./bin/arduino-cli lib install --all
+
+      # Компиляция ESP8266 (BIN)
+      - name: Compile ESP8266 sketch
         run: |
           ./bin/arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
-            --build-path ./build/Blink \
+            --build-path ./build/esp8266 \
             ./Blink/Blink.ino -v
 
-      - name: Convert ELF to HEX (optional)
+      # Компиляция Arduino Uno (HEX + BIN)
+      - name: Compile AVR sketch
         run: |
-          elf_file=$(find ./build/Blink -name "*.elf" | head -n1)
-          hex_file=./build/Blink/Blink.hex
-          if [ -f "$elf_file" ]; then
-            avr-objcopy -O ihex "$elf_file" "$hex_file" || echo "HEX may not be generated for ESP8266, use BIN instead"
-          fi
+          ./bin/arduino-cli compile \
+            --fqbn arduino:avr:uno \
+            --build-path ./build/avr \
+            ./Blink/Blink.ino -v
 
-      - name: Copy build artifacts to repository
-        run: |
-          shopt -s globstar
-          mkdir -p build_output
-          cp ./build/Blink/**/*.bin build_output/ 2>/dev/null || true
-          cp ./build/Blink/**/*.hex build_output/ 2>/dev/null || true
-          echo "Copied files:"
-          ls -R build_output
-
-      - name: Commit build artifacts
-        run: |
-          if [ -n "$(ls -A build_output)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add build_output/*
-            git commit -m "Add build artifacts [skip ci]" || echo "No changes to commit"
-            git push
-          else
-            echo "No build artifacts to commit."
-          fi
+      # Загрузка артефактов в GitHub Actions
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blink-artifacts
+          path: |
+            ./build/esp8266/**/*.bin
+            ./build/avr/**/*.hex
+            ./build/avr/**/*.bin
