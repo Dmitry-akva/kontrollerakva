@@ -35,7 +35,7 @@ jobs:
 
       # 4. Загружаем прошивку как артефакт
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: firmware-bin
-          path: src/build/esp8266/esp8266.nodemcuv2/*.bin
+         name: firmware-bin
+         path: src/build/esp8266/esp8266.nodemcuv2/*.bin
