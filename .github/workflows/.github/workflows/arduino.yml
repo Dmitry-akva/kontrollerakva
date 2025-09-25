@@ -1,1 +1,32 @@
+name: Arduino Build
 
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Arduino CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+          ./bin/arduino-cli config init --additional-urls https://downloads.arduino.cc/packages/package_index.json
+          ./bin/arduino-cli core update-index
+          ./bin/arduino-cli core install arduino:avr
+
+      - name: Compile sketch for Arduino Uno
+        run: |
+          ./bin/arduino-cli compile --fqbn arduino:avr:uno ./src
+          
+      - name: Upload HEX artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware-hex
+          path: src/build/arduino.avr.uno/*.hex
