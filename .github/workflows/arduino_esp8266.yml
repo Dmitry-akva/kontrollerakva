@@ -1,9 +1,7 @@
-name: ESP8266 Build
+name: ESP8266 Blink Build
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
     branches: [ main ]
 
 jobs:
@@ -11,11 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Получаем код
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Устанавливаем Arduino CLI и ядро ESP8266
       - name: Install Arduino CLI and ESP8266 core
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
@@ -23,19 +19,17 @@ jobs:
           ./bin/arduino-cli core update-index
           ./bin/arduino-cli core install esp8266:esp8266
 
-      # 3. Компиляция скетча для NodeMCU 1.0
-      - name: Compile sketch for NodeMCU 1.0 ESP12-E
+      - name: Compile Blink sketch
         run: |
           ./bin/arduino-cli compile \
-           --fqbn esp8266:esp8266:nodemcuv2 \
-           --build-property build.flash_size=4M \
-           --build-property build.f_cpu=80 \
-           --build-property upload.maximum_size=1019000 \
-           ./kontrollerakva_blink.ino
+            --fqbn esp8266:esp8266:nodemcuv2 \
+            --build-property build.flash_size=4M \
+            --build-property build.f_cpu=80 \
+            --build-property upload.maximum_size=1019000 \
+            ./kontrollerakva_blink.ino
 
-      # 4. Загружаем прошивку как артефакт
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-         name: firmware-bin
-         path: src/build/esp8266/esp8266.nodemcuv2/*.bin
+          name: blink-firmware
+          path: build/esp8266/esp8266.nodemcuv2/*.bin
