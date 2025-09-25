@@ -1,4 +1,4 @@
-name: Build ESP8266 Blink and Save to Repo
+name: Build ESP8266 Blink and Save Artifacts
 
 on:
   push:
@@ -34,20 +34,29 @@ jobs:
 
       - name: Convert ELF to HEX (optional)
         run: |
-          elf_file=$(find ./build/Blink -name "*.elf")
+          elf_file=$(find ./build/Blink -name "*.elf" | head -n1)
           hex_file=./build/Blink/Blink.hex
-          avr-objcopy -O ihex "$elf_file" "$hex_file" || echo "avr-objcopy may not work for ESP8266"
+          if [ -f "$elf_file" ]; then
+            avr-objcopy -O ihex "$elf_file" "$hex_file" || echo "HEX may not be generated for ESP8266, use BIN instead"
+          fi
 
-      - name: Copy binaries to repository folder
+      - name: Copy build artifacts to repository
         run: |
+          shopt -s globstar
           mkdir -p build_output
           cp ./build/Blink/**/*.bin build_output/ 2>/dev/null || true
-          cp ./build/Blink/Blink.hex build_output/ 2>/dev/null || true
+          cp ./build/Blink/**/*.hex build_output/ 2>/dev/null || true
+          echo "Copied files:"
+          ls -R build_output
 
       - name: Commit build artifacts
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add build_output/*
-          git commit -m "Add build artifacts [skip ci]" || echo "No changes to commit"
-          git push
+          if [ -n "$(ls -A build_output)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add build_output/*
+            git commit -m "Add build artifacts [skip ci]" || echo "No changes to commit"
+            git push
+          else
+            echo "No build artifacts to commit."
+          fi
