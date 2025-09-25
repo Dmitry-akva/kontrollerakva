@@ -1,4 +1,4 @@
-name: Build Arduino Sketch with Libraries and Save Artifacts
+name: Build ESP8266 Sketch
 
 on:
   push:
@@ -14,76 +14,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Кэш Arduino CLI
+      # 2. Кэш Arduino CLI
       - name: Cache Arduino CLI
         uses: actions/cache@v3
         with:
           path: ./bin
           key: arduino-cli-Linux-v1.3.1
 
-      - name: Install Arduino CLI
-        if: steps.cache.outputs.cache-hit != 'true'
+      # 3. Устанавливаем Arduino CLI и ESP8266 ядро
+      - name: Install Arduino CLI and ESP8266 core
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          ./bin/arduino-cli version
+          ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
+          ./bin/arduino-cli core update-index
+          ./bin/arduino-cli core install esp8266:esp8266
 
-      # Кэш платформ
+      # 4. Кэш платформы ESP8266
       - name: Cache ESP8266 platform
         uses: actions/cache@v3
         with:
           path: ~/.arduino15/packages/esp8266
           key: esp8266-core-Linux-v3.1.2
 
-      - name: Cache AVR platform
-        uses: actions/cache@v3
-        with:
-          path: ~/.arduino15/packages/arduino/hardware/avr
-          key: avr-core-Linux-v1.8.10
-
-      # Кэш библиотек
+      # 5. Кэш библиотек Arduino
       - name: Cache Arduino libraries
         uses: actions/cache@v3
         with:
           path: ~/.arduino15/libraries
           key: arduino-libraries-${{ hashFiles('**/*.ino') }}
 
-      # Настройка CLI и установка платформ
-      - name: Configure Arduino CLI and install platforms
-        run: |
-          ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
-          ./bin/arduino-cli core update-index
-          ./bin/arduino-cli core install esp8266:esp8266@3.1.2
-          ./bin/arduino-cli core install arduino:avr@1.8.10
-
-      # Установка библиотек из репозитория (если есть)
+      # 6. Устанавливаем все библиотеки проекта (если есть)
       - name: Install libraries
         run: ./bin/arduino-cli lib install --all
 
-      # Компиляция ESP8266 (BIN)
-      - name: Compile ESP8266 sketch
+      # 7. Очищаем папку build перед компиляцией
+      - name: Clean build folder
+        run: |
+          rm -rf ./build/esp8266
+          mkdir -p ./build/esp8266
+
+      # 8. Компиляция скетча Blink для NodeMCU 1.0
+      - name: Compile Blink sketch
         run: |
           ./bin/arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
+            --build-property build.flash_size=4M \
+            --build-property build.f_cpu=80 \
+            --build-property upload.maximum_size=1019000 \
             --build-path ./build/esp8266 \
-            ./Blink/Blink.ino -v
+            ./Blink
 
-      # Компиляция Arduino Uno (HEX + BIN)
-      - name: Compile AVR sketch
-        run: |
-          ./bin/arduino-cli compile \
-            --fqbn arduino:avr:uno \
-            --build-path ./build/avr \
-            ./Blink/Blink.ino -v
-
-      # Загрузка артефактов в GitHub Actions
-      - name: Upload build artifacts
+      # 9. Загружаем BIN как артефакт
+      - name: Upload BIN artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Blink-artifacts
-          path: |
-            ./build/esp8266/**/*.bin
-            ./build/avr/**/*.hex
-            ./build/avr/**/*.bin
+          name: Blink-BIN
+          path: ./build/esp8266/**/*.bin
