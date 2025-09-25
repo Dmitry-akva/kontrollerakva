@@ -1,4 +1,4 @@
-name: Arduino Build
+name: ESP8266 Build
 
 on:
   push:
@@ -11,21 +11,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Получаем код
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Arduino CLI
+      # 2. Устанавливаем Arduino CLI и ядро ESP8266
+      - name: Install Arduino CLI and ESP8266 core
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          ./bin/arduino-cli config init
+          ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
           ./bin/arduino-cli core update-index
-          ./bin/arduino-cli core install arduino:avr
+          ./bin/arduino-cli core install esp8266:esp8266
 
-      - name: Compile sketch for Arduino Uno
-        run: ./bin/arduino-cli compile --fqbn arduino:avr:uno ./src
+      # 3. Компиляция скетча для NodeMCU 1.0
+      - name: Compile sketch for NodeMCU 1.0 ESP12-E
+        run: |
+          ./bin/arduino-cli compile \
+            --fqbn esp8266:esp8266:nodemcuv2 \
+            --build-properties build.flash_size=4M \
+            --build-properties build.f_cpu=80 \
+            --build-properties upload.maximum_size=1019000 \
+            ./src
 
-      - name: Upload HEX artifact
+      # 4. Загружаем прошивку как артефакт
+      - name: Upload binary artifact
         uses: actions/upload-artifact@v3
         with:
-          name: firmware-hex
-          path: src/build/arduino.avr.uno/*.hex
+          name: firmware-bin
+          path: src/build/esp8266/esp8266.nodemcuv2/*.bin
