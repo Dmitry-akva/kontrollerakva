@@ -1,15 +1,18 @@
+const int LED_PIN = LED_BUILTIN;  // Встроенный светодиод
 
-// NodeMCU Blink
-const int LED_PIN = LED_BUILTIN;  // встроенный светодиод
+unsigned long previousMillis = 0;
+const long interval = 500;  // интервал в миллисекундах
+bool ledState = false;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
-  digitalWrite(LED_PIN, LOW);   // Вкл. светодиод (LOW для ESP8266)
-  delay(500);                    // пауза 500 мс
-  digitalWrite(LED_PIN, HIGH);  // Выкл. светодиод
-  delay(500);
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    ledState = !ledState;
+    digitalWrite(LED_PIN, ledState ? LOW : HIGH);  // LOW = включено для ESP8266
+  }
 }
-
