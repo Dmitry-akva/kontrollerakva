@@ -48,8 +48,13 @@ jobs:
           key: arduino-libraries-${{ hashFiles('**/*.ino') }}
 
       # 6. Устанавливаем все библиотеки проекта (если есть)
-      - name: Install libraries
-        run: ./bin/arduino-cli lib install --all
+      - name: Install project libraries
+        run: |
+          if [ -d ./libraries ]; then
+           for lib in ./libraries/*; do
+            ./bin/arduino-cli lib install "$lib"
+           done
+          fi
 
       # 7. Очищаем папку build перед компиляцией
       - name: Clean build folder
