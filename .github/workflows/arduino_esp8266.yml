@@ -31,7 +31,7 @@ jobs:
            --build-property build.flash_size=4M \
            --build-property build.f_cpu=80 \
            --build-property upload.maximum_size=1019000 \
-           ./src
+           ./kontrollerakva_blink.ino
 
       # 4. Загружаем прошивку как артефакт
       - name: Upload binary artifact
