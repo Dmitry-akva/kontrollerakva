@@ -1,4 +1,4 @@
-name: Build ESP8266 Blink
+name: Build ESP8266 Blink and Save to Repo
 
 on:
   push:
@@ -11,48 +11,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Получаем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2️⃣ Кэш Arduino CLI
-      - name: Cache Arduino CLI
-        uses: actions/cache@v4
-        with:
-          path: ./bin
-          key: arduino-cli-Linux-v1.3.1
-
-      # 3️⃣ Установка Arduino CLI
       - name: Install Arduino CLI
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
           ./bin/arduino-cli version
 
-      # 4️⃣ Кэш ESP8266 core
-      - name: Cache ESP8266 core
-        uses: actions/cache@v4
-        with:
-          path: ~/.arduino15/packages/esp8266
-          key: esp8266-core-Linux-v3.1.2
-
-      # 5️⃣ Настройка Arduino CLI и установка ESP8266
       - name: Configure Arduino CLI and install ESP8266
         run: |
           ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
           ./bin/arduino-cli core update-index
           ./bin/arduino-cli core install esp8266:esp8266@3.1.2
 
-      # 6️⃣ Кэш локальных библиотек
-      - name: Ensure lib folder exists
-        run: mkdir -p ./lib
-
-      - name: Cache local Arduino libraries
-        uses: actions/cache@v4
-        with:
-          path: ./lib
-          key: arduino-libraries-${{ runner.os }}-v1
-
-      # 7️⃣ Компиляция скетча
       - name: Compile Blink sketch
         run: |
           ./bin/arduino-cli compile \
@@ -60,13 +32,22 @@ jobs:
             --build-path ./build/Blink \
             ./Blink/Blink.ino -v
 
-      # 8️⃣ Проверка структуры build
-      - name: List build directory
-        run: ls -R ./build
+      - name: Convert ELF to HEX (optional)
+        run: |
+          elf_file=$(find ./build/Blink -name "*.elf")
+          hex_file=./build/Blink/Blink.hex
+          avr-objcopy -O ihex "$elf_file" "$hex_file" || echo "avr-objcopy may not work for ESP8266"
 
-      # 9️⃣ Загрузка артефакта
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Blink-bin
-          path: ./build/Blink/*.bin
+      - name: Copy binaries to repository folder
+        run: |
+          mkdir -p build_output
+          cp ./build/Blink/**/*.bin build_output/ 2>/dev/null || true
+          cp ./build/Blink/Blink.hex build_output/ 2>/dev/null || true
+
+      - name: Commit build artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add build_output/*
+          git commit -m "Add build artifacts [skip ci]" || echo "No changes to commit"
+          git push
