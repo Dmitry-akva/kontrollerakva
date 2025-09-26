@@ -1,7 +1,11 @@
 @echo off
 REM -----------------------------
-REM Автоматический пуш для обновления релиза на GitHub
+REM Автоматический пуш и обновление релиза на GitHub
 REM -----------------------------
+
+REM 0. Настройка имени и email для коммитов
+git config user.name "Dmitry Dubrovin"
+git config user.email "d.dubrovin@example.com"
 
 REM 1. Добавляем все изменения
 git add .
