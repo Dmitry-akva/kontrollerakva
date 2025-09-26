@@ -82,5 +82,5 @@ jobs:
       - name: Upload BIN artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Blink-BIN
-          path: ./build/esp8266/*.bin
+          name: esp8266-build
+          path: ./build/esp8266
