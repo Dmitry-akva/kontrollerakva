@@ -20,18 +20,28 @@ jobs:
 
       # 2. Кэш Arduino CLI
       - name: Cache Arduino CLI
+        id: cache-arduino-cli
         uses: actions/cache@v3
         with:
           path: ./bin
           key: arduino-cli-Linux-v1.3.1
 
-      # 1. Ставим Arduino CLI 1.3.1
+      # 3. Установка Arduino CLI (если не закэширован)
       - name: Install Arduino CLI
+        if: steps.cache-arduino-cli.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_1.3.1_Linux_64bit.tar.gz | tar xz
           mkdir -p ~/.arduino15
 
-      # 2. Конфигурируем Arduino CLI и ставим ESP8266 core 3.1.2 с фиксированным toolchain
+      # 4. Кэш ESP8266 core
+      - name: Cache ESP8266 platform
+        id: cache-esp8266-core
+        uses: actions/cache@v3
+        with:
+          path: ~/.arduino15/packages/esp8266
+          key: esp8266-core-Linux-v3.1.2
+
+      # 5. Установка ESP8266 core (только если не найден в кеше)
       - name: Install ESP8266 core
         if: steps.cache-esp8266-core.outputs.cache-hit != 'true'
         run: |
@@ -39,47 +49,38 @@ jobs:
           ./bin/arduino-cli core update-index
           ./bin/arduino-cli core install esp8266:esp8266@3.1.2
 
-
-      # 4. Кэш платформы ESP8266
-      - name: Cache ESP8266 platform
-        uses: actions/cache@v3
-        with:
-          path: ~/.arduino15/packages/esp8266
-          key: esp8266-core-Linux-v3.1.2
-
-      # 5. Кэш библиотек Arduino
+      # 6. Кэш Arduino библиотек
       - name: Cache Arduino libraries
         uses: actions/cache@v3
         with:
           path: ~/.arduino15/libraries
-          key: arduino-libraries-${{ hashFiles('**/*.ino') }}
+          key: arduino-libraries-${{ hashFiles('**/*.ino', '**/library.properties') }}
 
-      # 6. Устанавливаем все библиотеки проекта (если есть)
+      # 7. Установка локальных библиотек проекта (если есть)
       - name: Install project libraries
         run: |
           if [ -d ./libraries ]; then
-            for lib in ./libraries/*; do
-              ./bin/arduino-cli lib install "$lib"
-            done
+            mkdir -p ~/Arduino/libraries
+            cp -r ./libraries/* ~/Arduino/libraries/
           fi
-      # 7. Очищаем папку build перед компиляцией
+
+      # 8. Очистка папки build перед компиляцией
       - name: Clean build folder
         run: |
           rm -rf ./build/esp8266
           mkdir -p ./build/esp8266
-      # 8. Компиляция скетча Blink для NodeMCU 1.0
+
+      # 9. Компиляция скетча Blink для NodeMCU 1.0 (без кастомных build-property)
       - name: Compile Blink sketch
         run: |
           ./bin/arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
-            --build-property build.flash_size=4M \
-            --build-property build.f_cpu=80 \
-            --build-property upload.maximum_size=1019000 \
             --build-path ./build/esp8266 \
             ./Blink
-      # 9. Загружаем BIN как артефакт
+
+      # 10. Загружаем BIN как артефакт
       - name: Upload BIN artifact
         uses: actions/upload-artifact@v4
         with:
           name: Blink-BIN
-          path: ./build/esp8266/**/*.bin
+          path: ./build/esp8266/*.bin
