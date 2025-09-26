@@ -2,10 +2,10 @@ name: Build ESP8266 Sketch
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]   # пуш тега -> релиз
+    branches: [main]
+    tags: ['v*']   # пуш тега -> релиз
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: write   # нужно для создания Release
@@ -32,6 +32,8 @@ jobs:
         if: steps.cache-arduino-cli.outputs.cache-hit != 'true'
         run: |
           curl -fsSL https://downloads.arduino.cc/arduino-cli/arduino-cli_1.3.1_Linux_64bit.tar.gz | tar xz
+          mv arduino-cli ./bin/arduino-cli
+          chmod +x ./bin/arduino-cli
           mkdir -p ~/.arduino15
 
       # 4. Кэш ESP8266 core
@@ -54,21 +56,21 @@ jobs:
       - name: Cache Arduino libraries
         uses: actions/cache@v3
         with:
-          path: ~/.arduino15/libraries
+          path: ~/Arduino/libraries
           key: arduino-libraries-${{ hashFiles('**/*.ino', '**/library.properties') }}
 
       # 7. Установка локальных библиотек проекта
       - name: Install project libraries
         run: |
+          mkdir -p ~/Arduino/libraries
           if [ -d ./libraries ]; then
-            mkdir -p ~/Arduino/libraries
             cp -r ./libraries/* ~/Arduino/libraries/
           fi
 
       # 8. Очистка папки build
       - name: Clean build folder
         run: |
-          rm -rf ./build/esp8266
+          rm -rf ./build
           mkdir -p ./build/esp8266
 
       # 9. Компиляция скетча Blink
@@ -77,23 +79,28 @@ jobs:
           ./bin/arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
+            --build-cache-path ./build/cache \
             ./Blink
 
-      # 10. Создание zip архива build (для релиза)
+      # 10. Проверка созданных файлов
+      - name: List build files
+        run: ls -la ./build/esp8266/
+
+      # 11. Создание zip архива build (для релиза)
       - name: Zip build folder
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          cd ./build
-          zip -r esp8266-build.zip esp8266
+          cd ./build/esp8266
+          zip -r ../esp8266-build.zip .
 
-      # 11. Загрузка build в Actions (артефакт)
+      # 12. Загрузка build в Actions (артефакт)
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: esp8266-build
           path: ./build/esp8266
 
-      # 12. Автоматический релиз с файлами
+      # 13. Автоматический релиз с файлами
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
