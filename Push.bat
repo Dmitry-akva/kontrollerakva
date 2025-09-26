@@ -11,7 +11,7 @@ REM 1. Добавляем все изменения
 git add .
 
 REM 2. Коммитим с фиксированным сообщением
-git commit -m "Update firmware"
+git commit -m "Update arduino_esp8266.yml"
 
 REM 3. Перемещаем локальный тег на последний коммит (замени на свой тег)
 set TAG=v1.0.1
