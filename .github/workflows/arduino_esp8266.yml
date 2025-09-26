@@ -3,12 +3,12 @@ name: Build ESP8266 Sketch
 on:
   push:
     branches: [main]
-    tags: ['v*']   # пуш тега -> релиз
+    tags: ['v*']
   pull_request:
     branches: [main]
 
 permissions:
-  contents: write   # нужно для создания Release
+  contents: write
 
 jobs:
   build:
@@ -90,23 +90,26 @@ jobs:
       - name: Zip build folder
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          cd ./build/esp8266
-          zip -r ../esp8266-build.zip .
+          cd ./build
+          zip -r esp8266-build.zip esp8266
 
-      # 12. Загрузка build в Actions (артефакт)
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: esp8266-build
-          path: ./build/esp8266
+      # 12. Проверка существования файлов для релиза
+      - name: Check release files exist
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          echo "Files to be included in release:"
+          ls -la ./build/esp8266/*.bin
+          ls -la ./build/esp8266/*.elf
+          ls -la ./build/esp8266/*.map
+          ls -la ./build/esp8266-build.zip
 
-      # 13. Автоматический релиз с файлами
+      # 13. Создание Release
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./build/esp8266/*.bin
-            ./build/esp8266/*.elf
-            ./build/esp8266/*.map
+            ./build/esp8266/Blink.ino.bin
+            ./build/esp8266/Blink.ino.elf
+            ./build/esp8266/Blink.ino.map
             ./build/esp8266-build.zip
