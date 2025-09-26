@@ -79,28 +79,21 @@ jobs:
             --build-path ./build/esp8266 \
             ./Blink
 
-      # 10. Генерация HEX файла
-      - name: Generate HEX file
-        run: |
-          for f in ./build/esp8266/*.elf; do
-            arm-none-eabi-objcopy -O ihex "$f" "${f%.elf}.hex" || true
-          done
-
-      # 11. Упаковка build в zip (для релиза)
+      # 10. Создание zip архива build (для релиза)
       - name: Zip build folder
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd ./build
           zip -r esp8266-build.zip esp8266
 
-      # 12. Загрузка артефакта в Actions
-      - name: Upload build folder
+      # 11. Загрузка build в Actions (артефакт)
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: esp8266-build
           path: ./build/esp8266
 
-      # 13. Создание Release и загрузка bin/elf/map/hex/zip
+      # 12. Автоматический релиз с файлами
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -109,5 +102,4 @@ jobs:
             ./build/esp8266/*.bin
             ./build/esp8266/*.elf
             ./build/esp8266/*.map
-            ./build/esp8266/*.hex
             ./build/esp8266-build.zip
