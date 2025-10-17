@@ -32,13 +32,16 @@ echo GitHub Actions соберёт и обновит релиз.
 echo ===============================
 echo.
 
-REM === 4. Ждём 15 секунд для запуска workflow ===
+REM === 4. Ждём 15 секунд для старта workflow ===
 echo ⏳ Ждём, чтобы workflow успел стартовать...
 timeout /t 15 >nul
 
 REM === 5. Получаем ID workflow по тегу ===
 :WAIT_WORKFLOW
-for /f "tokens=*" %%i in ('gh run list --workflow "%WORKFLOW_NAME%" --limit 5 --json databaseId,headRefName -q ".[] | select(.headRefName==\"%TAG%\").databaseId"') do set RUN_ID=%%i
+set RUN_ID=
+for /f "tokens=*" %%i in (
+    'gh run list --workflow "%WORKFLOW_NAME%" --limit 10 --json databaseId,headBranch -q ".[] | select(.headBranch==\"%TAG%\").databaseId"'
+) do set RUN_ID=%%i
 
 if "%RUN_ID%"=="" (
     echo ⏳ Workflow ещё не найден, ждём %WAIT_TIME% секунд...
@@ -66,7 +69,7 @@ if "%STATUS%"=="in_progress" (
 echo ✅ Workflow завершён со статусом: %CONCLUSION%
 echo.
 
-REM === 7. Скачиваем лог в файл и выводим в терминал ===
+REM === 7. Скачиваем лог сборки и выводим в терминал ===
 echo ⏬ Получаем лог сборки...
 gh run view %RUN_ID% --log > build-log.txt
 type build-log.txt
