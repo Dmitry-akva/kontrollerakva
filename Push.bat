@@ -40,10 +40,8 @@ REM === 5. Ждём workflow, связанный с этим коммитом ==
 :WAIT_WORKFLOW
 set RUN_ID=
 for /f "tokens=*" %%i in (
-    'gh run list --workflow "%WORKFLOW_NAME%" --branch main --limit 5 --json databaseId,headSha -q ".[].databaseId | select(.!=null)"'
-) do (
-    set RUN_ID=%%i
-)
+    'gh run list --workflow "%WORKFLOW_NAME%" --branch main -c %COMMIT_SHA% --limit 1 --json databaseId -q ".[0].databaseId"'
+) do set RUN_ID=%%i
 
 if "%RUN_ID%"=="" (
     echo ⏳ Workflow ещё не найден, ждём %WAIT_TIME% секунд...
