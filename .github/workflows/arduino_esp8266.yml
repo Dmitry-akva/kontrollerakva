@@ -80,11 +80,11 @@ jobs:
       - name: Compile Blink sketch
           run: |
             ./bin/arduino-cli compile \
-              --fqbn esp8266:esp8266:nodemcuv2 \
-              --build-path ./build/esp8266 \
-              ./Blink \
-              --output-dir ./build/esp8266 \
-              --verbose
+            --fqbn esp8266:esp8266:nodemcuv2 \
+            --build-path ./build/esp8266 \
+            ./Blink \
+            --output-dir ./build/esp8266 \
+            --verbose
 
       # 10. Генерация HEX из ELF
       - name: Convert ELF to HEX
