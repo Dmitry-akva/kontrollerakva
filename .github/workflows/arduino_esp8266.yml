@@ -57,7 +57,7 @@ jobs:
           arduino-cli lib install "OneWire"
           arduino-cli lib install "DallasTemperature"
           arduino-cli lib install "FileData"
-          arduino-cli lib install "LittleFS"
+          
           arduino-cli lib install "GyverPortal"
           arduino-cli lib install "GyverHC595"
           arduino-cli lib install "GTimer"
