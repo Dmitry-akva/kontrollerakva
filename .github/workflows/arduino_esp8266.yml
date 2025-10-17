@@ -74,7 +74,7 @@ jobs:
           mkdir -p ./build/esp8266
 
       - name: Install binutils-arm-none-eabi
-          run: sudo apt-get update && sudo apt-get install -y binutils-arm-none-eabi
+        run: sudo apt-get update && sudo apt-get install -y binutils-arm-none-eabi
 
       # 9. Компиляция скетча Blink
       - name: Compile Blink sketch
