@@ -71,6 +71,7 @@ jobs:
       # 9. Компиляция скетча Blink с экспортом HEX и BIN
       - name: Compile Blink sketch
         run: |
+          echo "Build started at $(date)" > build-log.txt
           arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
