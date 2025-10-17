@@ -79,22 +79,25 @@ if "%STATUS%"=="queued" (
 echo ✅ Workflow завершён.
 echo.
 
-REM === 7. Скачиваем лог и ждём пока файл не станет не пустым ===
-echo ⏬ Ждём появления лога сборки и выводим его в терминал...
+REM === 7. Скачиваем свежий build-log.txt из релиза ===
+echo ⏬ Скачиваем build-log.txt из релиза %TAG%...
+gh release download %TAG% --pattern "build-log.txt" --dir . >nul 2>&1
 
-:DOWNLOAD_LOG
-gh run view %RUN_ID% --log > build-log.txt 2>nul
-
-REM Проверяем размер файла
-for %%i in (build-log.txt) do set FILESIZE=%%~zi
-
-if "%FILESIZE%"=="0" (
-    echo ⏳ Лог ещё не готов, ждём 5 секунд...
-    timeout /t 5 >nul
-    goto DOWNLOAD_LOG
+REM Проверяем, что файл существует и не пустой
+if not exist build-log.txt (
+    echo ❌ Файл build-log.txt не найден в релизе %TAG%.
+    pause
+    exit /b
 )
 
-REM Лог готов — выводим в консоль
+for %%i in (build-log.txt) do set FILESIZE=%%~zi
+if "%FILESIZE%"=="0" (
+    echo ❌ build-log.txt пустой!
+    pause
+    exit /b
+)
+
+REM Выводим лог в терминал
 type build-log.txt
 
 pause
