@@ -10,6 +10,7 @@ REM === Настройки ===
 set TAG=v1.0.0
 set WORKFLOW_NAME=Build ESP8266 Sketch
 set WAIT_TIME=20
+set MAX_ATTEMPTS=20
 
 REM === 1. Добавляем все изменения ===
 git add .
@@ -19,31 +20,34 @@ set /p MSG="Введите комментарий коммита: "
 if "%MSG%"=="" set MSG=Auto update
 git commit -m "%MSG%"
 
-REM === 3. Получаем SHA текущего коммита ===
-for /f "tokens=*" %%i in ('git rev-parse HEAD') do set COMMIT_SHA=%%i
-echo SHA коммита: %COMMIT_SHA%
-
-REM === 4. Перезаписываем тег на новый коммит ===
+REM === 3. Перезаписываем тег на новый коммит ===
 git tag -f %TAG%
 git push origin main
 git push origin -f %TAG%
 
-echo.
-echo ===============================
-echo ✅ Push complete!
-echo Тег %TAG% перезаписан на новый коммит.
-echo GitHub Actions соберёт и обновит релиз.
-echo ===============================
+REM === 4. Получаем дату и время последнего коммита в ISO 8601 ===
+for /f "tokens=*" %%i in ('git log -1 --format="%%cI"') do set COMMIT_DATE=%%i
+echo SHA коммита: 
+for /f "tokens=*" %%i in ('git rev-parse HEAD') do set COMMIT_SHA=%%i
+echo %COMMIT_SHA%
+echo Commit date: %COMMIT_DATE%
 echo.
 
-REM === 5. Ждём workflow, связанный с этим коммитом ===
+REM === 5. Ждём workflow, связанный с этим коммитом (по дате) ===
+set ATTEMPT=0
 :WAIT_WORKFLOW
+set /a ATTEMPT+=1
 set RUN_ID=
 for /f "tokens=*" %%i in (
-    'gh run list --workflow "%WORKFLOW_NAME%" --branch main -c %COMMIT_SHA% --limit 1 --json databaseId -q ".[0].databaseId"'
+    'gh run list --workflow "%WORKFLOW_NAME%" --branch main --created "%COMMIT_DATE%" --limit 1 --json databaseId -q ".[0].databaseId"'
 ) do set RUN_ID=%%i
 
 if "%RUN_ID%"=="" (
+    if %ATTEMPT% GEQ %MAX_ATTEMPTS% (
+        echo ❌ Workflow так и не найден. Прерывание.
+        pause
+        exit /b
+    )
     echo ⏳ Workflow ещё не найден, ждём %WAIT_TIME% секунд...
     timeout /t %WAIT_TIME% >nul
     goto WAIT_WORKFLOW
