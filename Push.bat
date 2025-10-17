@@ -37,16 +37,10 @@ REM === 4. Ждём появления workflow ===
 echo ⏳ Ждём старт workflow...
 timeout /t %WAIT_TIME% >nul
 
-for /f "tokens=*" %%i in ('gh run list --workflow "%WORKFLOW_NAME%" --branch refs/tags/%TAG% --limit 1 --json databaseId,status -q ".[0].databaseId"') do set RUN_ID=%%i
+REM Получаем ID последнего workflow для указанного тега
+for /f "tokens=*" %%i in ('gh run list --workflow "Build ESP8266 Sketch" --branch refs/tags/%TAG% --limit 1 --json databaseId -q ".[0].databaseId"') do set RUN_ID=%%i
 
-if "%RUN_ID%"=="" (
-    goto WAIT_WORKFLOW
-)
-
-echo ✅ Workflow найден! ID=%RUN_ID%
-echo.
-
-REM === 5. Ждём завершения workflow ===
+REM Ждём завершения workflow
 :WAIT_COMPLETION
 for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"') do set STATUS_CONC=%%i
 for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
@@ -55,13 +49,12 @@ for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
 )
 
 if "%STATUS%"=="in_progress" (
-    echo ⏳ Workflow выполняется, ждём %WAIT_TIME% секунд...
-    timeout /t %WAIT_TIME% >nul
+    echo Workflow выполняется, ждём 10 секунд...
+    timeout /t 10 >nul
     goto WAIT_COMPLETION
 )
 
-echo ✅ Workflow завершён со статусом: %CONCLUSION%
-echo.
+echo Workflow завершён со статусом: %CONCLUSION%echo.
 
 REM === 6. Скачиваем лог в файл и выводим в терминал ===
 echo ⏬ Получаем лог сборки...
