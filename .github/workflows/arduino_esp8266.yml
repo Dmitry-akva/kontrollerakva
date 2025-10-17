@@ -75,7 +75,7 @@ jobs:
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
             --export-binaries \
-            --verbose ./Blink/Blink.ino | tee ./build/build-log.txt
+            --verbose ./Blink/Blink.ino
 
       # 10. Проверка созданных файлов
       - name: List build files
@@ -97,5 +97,6 @@ jobs:
             ./build/esp8266/*.elf
             ./build/esp8266/*.map
             ./build/esp8266-build.zip
+            ./build-log.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
