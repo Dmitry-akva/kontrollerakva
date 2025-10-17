@@ -70,8 +70,7 @@ jobs:
 
       # 9. Компиляция скетча Blink с экспортом HEX и BIN
       - name: Compile Blink sketch
-        run: | 
-          arduino-cli board details --fqbn esp8266:esp8266:nodemcuv2 > ./build/board-info.txt         
+        run: |                    
           arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
@@ -88,6 +87,7 @@ jobs:
           echo "💾 Отчёт о памяти:" >> build-log.txt
           echo "==============================" >> build-log.txt
           grep -E "used [0-9]+ / [0-9]+ bytes" raw-log.txt >> build-log.txt
+          arduino-cli board details --fqbn esp8266:esp8266:nodemcuv2 >> build-log.txt || true
 
       # 10. Проверка созданных файлов
       - name: List build files
