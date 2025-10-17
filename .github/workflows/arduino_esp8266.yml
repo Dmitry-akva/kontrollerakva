@@ -2,7 +2,8 @@ name: Build ESP8266 Sketch
 
 on:
   push:
-    tags: ['v*']
+    tags: ['v*']  # workflow запускается только на теги v*
+
 permissions:
   contents: write  # нужно для создания/обновления релиза
 
@@ -15,23 +16,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Кэш Arduino CLI
-      - name: Cache Arduino CLI
-        id: cache-arduino-cli
-        uses: actions/cache@v3
-        with:
-          path: ./bin
-          key: arduino-cli-Linux-v1.3.1
-
-      # 3. Установка Arduino CLI
+      # 2. Установка Arduino CLI через официальный Action
       - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v2.0.0
+        uses: arduino/setup-arduino-cli@v2
         with:
-         version: 1.3.1
-      
+          version: 1.3.1
+
+      # 3. Проверка установки Arduino CLI
       - name: Check Arduino CLI
         run: arduino-cli version
-         
+
       # 4. Кэш ESP8266 core
       - name: Cache ESP8266 platform
         id: cache-esp8266-core
@@ -40,12 +34,13 @@ jobs:
           path: ~/.arduino15/packages/esp8266
           key: esp8266-core-Linux-v3.1.2
 
-      # 5. Установка ESP8266 core
-      - name: Install ESP8266 core        
+      # 5. Установка ESP8266 core (только если кэш не сработал)
+      - name: Install ESP8266 core
+        if: steps.cache-esp8266-core.outputs.cache-hit != 'true'
         run: |
-          ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
-          ./bin/arduino-cli core update-index
-          ./bin/arduino-cli core install esp8266:esp8266@3.1.2
+          arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp8266:esp8266@3.1.2
 
       # 6. Кэш библиотек Arduino
       - name: Cache Arduino libraries
@@ -68,54 +63,28 @@ jobs:
           rm -rf ./build
           mkdir -p ./build/esp8266
 
-      - name: Install binutils-arm-none-eabi
-        run: sudo apt-get update && sudo apt-get install -y binutils-arm-none-eabi
-
-      # 9. Компиляция скетча Blink
+      # 9. Компиляция скетча Blink с экспортом HEX и BIN
       - name: Compile Blink sketch
         run: |
-            ./bin/arduino-cli compile \
+          arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
-            ./Blink \
-            --output-dir ./build/esp8266 \
-            --verbose
+            --build-cache-path ./build/cache \
+            --export-binaries \
+            ./Blink
 
-      # 10. Генерация HEX из ELF
-      - name: Convert ELF to HEX
-        run: |
-           xtensa-lx106-elf-objcopy -O ihex ./build/esp8266/Blink.ino.elf ./build/esp8266/Blink.ino.hex
-
-      # 11. Проверка файлов
+      # 10. Проверка созданных файлов
       - name: List build files
-        run: |
-            echo "Files to be included in release:"
-            ls -la ./build/esp8266/*.bin
-            ls -la ./build/esp8266/*.elf
-            ls -la ./build/esp8266/*.map
-            ls -la ./build/esp8266/*.hex        
+        run: ls -la ./build/esp8266/
 
-      # 11. Создание zip архива build (для релиза)
+      # 11. Создание zip архива build для релиза
       - name: Zip build folder
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd ./build
           zip -r esp8266-build.zip esp8266
 
-      # 12. Проверка существования файлов для релиза
-      - name: Check release files exist
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          echo "Files to be included in release:"
-          ls -la ./build/esp8266/*.bin
-          ls -la ./build/esp8266/*.elf
-          ls -la ./build/esp8266/*.map
-          ls -la ./build/esp8266/*.hex
-          ls -la ./build/esp8266-build.zip
-
-      # 13. Создание или обновление Release
+      # 12. Создание или обновление Release на GitHub
       - name: Create or Update Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
