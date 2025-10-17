@@ -75,7 +75,7 @@ jobs:
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
             --export-binaries \
-            --verbose ./Blink/Blink.ino
+            --verbose ./Blink/Blink.ino | tee ./build-log.txt
 
       # 10. Проверка созданных файлов
       - name: List build files
