@@ -2,11 +2,7 @@ name: Build ESP8266 Sketch
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
-
 permissions:
   contents: write  # нужно для создания/обновления релиза
 
