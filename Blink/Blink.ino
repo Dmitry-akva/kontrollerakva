@@ -13,7 +13,7 @@
 
 GyverPortal ui(&LittleFS);  // передать ссылку на fs (SPIFFS/LittleFS)
 GyverHC595<1, HC_SPI> reg(12);
-///////////////////////////////ETYывппERT/////////fgh///
+///////////////////////////////EппERT/////////fgh///
 #define ONE_WIRE_BUS 0 // Пин подключения OneWire шины, gpio0
 OneWire oneWire(ONE_WIRE_BUS); // Подключаем бибилотеку OneWire
 DallasTemperature sensors(&oneWire); // Подключаем бибилотеку DallasTemperature

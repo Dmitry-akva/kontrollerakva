@@ -12,6 +12,10 @@ set WORKFLOW_NAME=Build ESP8266 Sketch
 set WAIT_TIME=20
 set MAX_ATTEMPTS=20
 
+REM === 0. Настройка git user (один раз) ===
+git config --global user.name "Dmitry Dubrovin"
+git config --global user.email "d.dubrovin@example.com"
+
 REM === 1. Добавляем все изменения ===
 git add .
 
@@ -75,9 +79,22 @@ if "%STATUS%"=="queued" (
 echo ✅ Workflow завершён.
 echo.
 
-REM === 7. Сохраняем лог и выводим в терминал ===
-echo ⏬ Выводим лог сборки прямо в терминал:
-gh run view %RUN_ID% --log > build-log.txt
+REM === 7. Скачиваем лог и ждём пока файл не станет не пустым ===
+echo ⏬ Ждём появления лога сборки и выводим его в терминал...
+
+:DOWNLOAD_LOG
+gh run view %RUN_ID% --log > build-log.txt 2>nul
+
+REM Проверяем размер файла
+for %%i in (build-log.txt) do set FILESIZE=%%~zi
+
+if "%FILESIZE%"=="0" (
+    echo ⏳ Лог ещё не готов, ждём 5 секунд...
+    timeout /t 5 >nul
+    goto DOWNLOAD_LOG
+)
+
+REM Лог готов — выводим в консоль
 type build-log.txt
 
 pause
