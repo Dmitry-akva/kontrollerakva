@@ -32,22 +32,24 @@ echo GitHub Actions соберёт и обновит релиз.
 echo ===============================
 echo.
 
-REM === 4. Ждём появления workflow ===
+REM === 4. Ждём 15 секунд для запуска workflow ===
+echo ⏳ Ждём, чтобы workflow успел стартовать...
+timeout /t 15 >nul
+
+REM === 5. Получаем ID workflow по тегу ===
 :WAIT_WORKFLOW
-echo ⏳ Ждём старт workflow...
-timeout /t %WAIT_TIME% >nul
+for /f "tokens=*" %%i in ('gh run list --workflow "%WORKFLOW_NAME%" --limit 5 --json databaseId,headRefName -q ".[] | select(.headRefName==\"%TAG%\").databaseId"') do set RUN_ID=%%i
 
-REM 1. Получаем ID последнего workflow для тега
-for /f "tokens=*" %%i in ('gh run list --workflow "Build ESP8266 Sketch" --branch refs/tags/%TAG% --limit 1 --json databaseId -q ".[0].databaseId"') do set RUN_ID=%%i
-
-REM 2. Проверяем, что нашли ID
 if "%RUN_ID%"=="" (
-    echo ❌ Workflow для тега %TAG% не найден
-    pause
-    exit /b
+    echo ⏳ Workflow ещё не найден, ждём %WAIT_TIME% секунд...
+    timeout /t %WAIT_TIME% >nul
+    goto WAIT_WORKFLOW
 )
 
-REM 3. Ждём завершения workflow
+echo ✅ Workflow найден! ID=%RUN_ID%
+echo.
+
+REM === 6. Ждём завершения workflow ===
 :WAIT_COMPLETION
 for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"') do set STATUS_CONC=%%i
 for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
@@ -56,14 +58,16 @@ for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
 )
 
 if "%STATUS%"=="in_progress" (
-    echo Workflow выполняется, ждём 10 секунд...
-    timeout /t 10 >nul
+    echo ⏳ Workflow выполняется, ждём %WAIT_TIME% секунд...
+    timeout /t %WAIT_TIME% >nul
     goto WAIT_COMPLETION
 )
 
-echo Workflow завершён со статусом: %CONCLUSION%
+echo ✅ Workflow завершён со статусом: %CONCLUSION%
+echo.
 
-REM 4. Скачиваем и выводим лог
+REM === 7. Скачиваем лог в файл и выводим в терминал ===
+echo ⏬ Получаем лог сборки...
 gh run view %RUN_ID% --log > build-log.txt
 type build-log.txt
 
