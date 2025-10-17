@@ -24,7 +24,7 @@ jobs:
           key: arduino-cli-Linux-v1.3.1
 
       # 3. Установка Arduino CLI
-      - name: Install Arduino CLI
+      - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
         with:
          version: 1.3.1
@@ -38,8 +38,7 @@ jobs:
           key: esp8266-core-Linux-v3.1.2
 
       # 5. Установка ESP8266 core
-      - name: Install ESP8266 core
-        if: steps.cache-esp8266-core.outputs.cache-hit != 'true'
+      - name: Install ESP8266 core        
         run: |
           ./bin/arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
           ./bin/arduino-cli core update-index
