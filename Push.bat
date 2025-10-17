@@ -52,7 +52,7 @@ if "%RUN_ID%"=="" (
 echo ✅ Workflow найден! ID=%RUN_ID%
 echo.
 
-REM === 6. Ждём завершения workflow ===
+REM Ждём завершения workflow
 :WAIT_COMPLETION
 for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"') do set STATUS_CONC=%%i
 for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
@@ -69,9 +69,8 @@ if "%STATUS%"=="in_progress" (
 echo ✅ Workflow завершён со статусом: %CONCLUSION%
 echo.
 
-REM === 7. Скачиваем лог сборки и выводим в терминал ===
+REM Скачиваем лог только после завершения workflow
 echo ⏬ Получаем лог сборки...
 gh run view %RUN_ID% --log > build-log.txt
 type build-log.txt
-
 pause
