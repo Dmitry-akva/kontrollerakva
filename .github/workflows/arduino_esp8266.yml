@@ -71,7 +71,6 @@ jobs:
             --build-path ./build/esp8266 \
             --build-cache-path ./build/cache \
             --export-binaries \
-            --export-hex \
             ./Blink
 
       # 10. Проверка созданных файлов
@@ -93,7 +92,6 @@ jobs:
             ./build/esp8266/*.bin
             ./build/esp8266/*.elf
             ./build/esp8266/*.map
-            ./build/esp8266/*.hex
             ./build/esp8266-build.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
