@@ -6,54 +6,54 @@ echo ===============================
 echo 🚀 Auto Push + Update Release
 echo ===============================
 
+REM === Настройки ===
 set TAG=v1.0.0
-set WAIT_LOG=10
-set MAX_ATTEMPTS_LOG=60  REM увеличиваем, чтобы хватило на компиляцию
 
-REM === 1. Git add + commit + push + форс тег ===
+REM === 1. Добавляем все изменения ===
 git add .
+
+REM === 2. Коммит ===
 set /p MSG="Введите комментарий коммита: "
 if "%MSG%"=="" set MSG=Auto update
 git commit -m "%MSG%"
+
+REM === 3. Перезаписываем тег на новый коммит ===
 git tag -f %TAG%
 git push origin main
 git push origin -f %TAG%
 
-echo.
-echo ✅ Push завершён. Ждём завершения компиляции и build-log.txt...
-echo.
-
-REM === 2. Цикл ожидания build-log.txt в релизе ===
-set ATTEMPT_LOG=0
-:WAIT_LOG
-set /a ATTEMPT_LOG+=1
-
-REM Скачиваем файл (перезаписывает каждый раз)
-gh release download %TAG% --pattern "build-log.txt" --dir . >nul 2>&1
-
-REM Проверяем размер файла
-if exist build-log.txt (
-    for %%i in (build-log.txt) do set FILESIZE=%%~zi
-    if %FILESIZE% GTR 0 (
-        echo ✅ build-log.txt загружен и не пустой
-        goto SHOW_LOG
+REM === 4. Удаляем старые артефакты релиза ===
+for /f "tokens=*" %%i in ('gh release view %TAG% --json id -q ".id" 2^>nul') do set RELEASE_ID=%%i
+if defined RELEASE_ID (
+    echo ❌ Релиз %TAG% найден. Удаляем все артефакты...
+    for /f "tokens=*" %%a in ('gh release view %TAG% --json assets -q ".assets[].name"') do (
+        echo Удаляем %%a
+        gh release delete-asset %%a --release %RELEASE_ID% --confirm
     )
 )
 
-if %ATTEMPT_LOG% GEQ %MAX_ATTEMPTS_LOG (
-    echo ❌ build-log.txt так и не появился после ожидания.
-    pause
-    exit /b
+REM === 5. Цикл скачивания build-log.txt до тех пор, пока файл не будет не пустой ===
+:DOWNLOAD_LOG
+echo ⏬ Скачиваем build-log.txt из релиза %TAG%...
+gh release download %TAG% --pattern "build-log.txt" --dir . --force
+
+if not exist build-log.txt (
+    echo ⚠️ Файл build-log.txt не найден. Пробуем снова через 10 секунд...
+    timeout /t 10 >nul
+    goto DOWNLOAD_LOG
 )
 
-echo ⏳ build-log.txt ещё пустой. Ждём %WAIT_LOG% секунд...
-timeout /t %WAIT_LOG% >nul
-goto WAIT_LOG
+for %%i in (build-log.txt) do if %%~zi==0 (
+    echo ⚠️ Файл пустой. Пробуем снова через 10 секунд...
+    timeout /t 10 >nul
+    goto DOWNLOAD_LOG
+)
 
-:SHOW_LOG
-echo.
-echo ⏬ Лог сборки:
+REM === 6. Выводим лог в терминал ===
 type build-log.txt
-echo.
 
+echo.
+echo ===============================
+echo ✅ Всё готово!
+echo ===============================
 pause
