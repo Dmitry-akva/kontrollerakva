@@ -1,30 +1,40 @@
 @echo off
-REM -----------------------------
-REM Автоматический пуш и обновление релиза на GitHub
-REM -----------------------------
-
-REM 0. Настройка имени и email для коммитов
-git config user.name "Dmitry Dubrovin"
-git config user.email "d.dubrovin@example.com"
-
+chcp 65001 >nul
+echo ===============================
+echo Auto Push + Tag for GitHub Build
+echo ===============================
 REM 1. Добавляем все изменения
 git add .
 
-REM 2. Коммитим с фиксированным сообщением
-git commit -m "Update arduino_esp8266.yml"
+REM 2. Коммитим с сообщением
+set /p MSG="Введите комментарий коммита: "
+if "%MSG%"=="" set MSG=Auto build
+git commit -m "%MSG%"
 
-REM 3. Перемещаем локальный тег на последний коммит (замени на свой тег)
-set TAG=v1.0.1
-git tag -f %TAG%
+REM 3. Определяем последний тег и увеличиваем версию
+for /f "tokens=2 delims=v" %%a in ('git describe --tags --abbrev^=0 2^>nul') do set LAST=%%a
+if "%LAST%"=="" (set LAST=0.0.0)
 
-REM 4. Пушим тег на GitHub с форсом
-git push origin -f %TAG%
+for /f "tokens=1-3 delims=." %%a in ("%LAST%") do (
+    set MAJOR=%%a
+    set MINOR=%%b
+    set PATCH=%%c
+)
 
-REM 5. Пушим ветку main с форсом
-git push origin main --force
+set /a PATCH=%PATCH%+1
+set TAG=v%MAJOR%.%MINOR%.%PATCH%
+
+echo 🏷 Новый тег: %TAG%
+
+REM 4. Создаём и пушим новый тег
+git tag -a %TAG% -m "%MSG%"
+git push origin main
+git push origin %TAG%
 
 echo.
 echo ===============================
-echo Push complete. Workflow should start on GitHub.
+echo ✅ Push complete.
+echo Новый тег %TAG% отправлен на GitHub.
+echo GitHub Actions теперь сам соберёт прошивку.
 echo ===============================
 pause
