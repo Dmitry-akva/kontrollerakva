@@ -1,7 +1,7 @@
 const int LED_PIN = LED_BUILTIN;  // Встроенный светодиод
 
 unsigned long previousMillis = 0;
-const long interval = 500;  // интервал в миллисекундах
+const long interval = 800;  // интервал в миллисекундах
 bool ledState = false;
 
 void setup() {
