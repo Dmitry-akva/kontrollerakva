@@ -9,7 +9,7 @@ echo ===============================
 REM === Настройки ===
 set TAG=v1.0.0
 set WORKFLOW_NAME=Build ESP8266 Sketch
-set WAIT_TIME=10
+set WAIT_TIME=15
 
 REM === 1. Добавляем все изменения ===
 git add .
@@ -32,7 +32,7 @@ echo GitHub Actions соберёт и обновит релиз.
 echo ===============================
 echo.
 
-REM === 4. Ждём 30 секунд для старта workflow ===
+REM === 4. Ждём 30 секунд, чтобы workflow успел стартовать ===
 echo ⏳ Ждём 30 секунд, чтобы workflow успел стартовать...
 timeout /t 30 >nul
 
@@ -52,9 +52,12 @@ if "%RUN_ID%"=="" (
 echo ✅ Workflow найден! ID=%RUN_ID%
 echo.
 
-REM === 6. Ждём завершения workflow ===
+REM === 6. Ждём полного завершения workflow ===
 :WAIT_COMPLETION
-for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"') do set STATUS_CONC=%%i
+for /f "tokens=*" %%i in (
+    'gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"'
+) do set STATUS_CONC=%%i
+
 for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
     set STATUS=%%a
     set CONCLUSION=%%b
@@ -66,11 +69,17 @@ if "%STATUS%"=="in_progress" (
     goto WAIT_COMPLETION
 )
 
+if "%STATUS%"=="queued" (
+    echo ⏳ Workflow ещё в очереди, ждём %WAIT_TIME% секунд...
+    timeout /t %WAIT_TIME% >nul
+    goto WAIT_COMPLETION
+)
+
 echo ✅ Workflow завершён со статусом: %CONCLUSION%
 echo.
 
-REM === 7. Скачиваем лог сборки и выводим в терминал ===
-echo ⏬ Получаем лог сборки...
+REM === 7. Сохраняем лог в build-log.txt и выводим сразу в терминал ===
+echo ⏬ Выводим лог сборки прямо в терминал:
 gh run view %RUN_ID% --log > build-log.txt
 type build-log.txt
 
