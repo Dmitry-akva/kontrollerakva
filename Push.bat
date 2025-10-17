@@ -12,10 +12,6 @@ set WORKFLOW_NAME=Build ESP8266 Sketch
 set WAIT_TIME=20
 set MAX_ATTEMPTS=20
 
-REM === 0. Настройка git user (один раз) ===
-git config --global user.name "Dmitry Dubrovin"
-git config --global user.email "d.dubrovin@example.com"
-
 REM === 1. Добавляем все изменения ===
 git add .
 
@@ -79,25 +75,41 @@ if "%STATUS%"=="queued" (
 echo ✅ Workflow завершён.
 echo.
 
-REM === 7. Скачиваем свежий build-log.txt из релиза ===
-echo ⏬ Скачиваем build-log.txt из релиза %TAG%...
+REM === 7. Скачиваем свежий build-log.txt из релиза с ожиданием ===
+set ATTEMPT=0
+set MAX_ATTEMPTS_LOG=10
+set WAIT_LOG=5
+
+:WAIT_LOG_FILE
+set /a ATTEMPT+=1
 gh release download %TAG% --pattern "build-log.txt" --dir . >nul 2>&1
 
-REM Проверяем, что файл существует и не пустой
 if not exist build-log.txt (
-    echo ❌ Файл build-log.txt не найден в релизе %TAG%.
-    pause
-    exit /b
+    if %ATTEMPT% GEQ %MAX_ATTEMPTS_LOG (
+        echo ❌ build-log.txt не найден в релизе %TAG% после ожидания
+        pause
+        exit /b
+    )
+    echo ⏳ build-log.txt ещё не загружен, ждём %WAIT_LOG% секунд...
+    timeout /t %WAIT_LOG% >nul
+    goto WAIT_LOG_FILE
 )
 
 for %%i in (build-log.txt) do set FILESIZE=%%~zi
 if "%FILESIZE%"=="0" (
-    echo ❌ build-log.txt пустой!
-    pause
-    exit /b
+    if %ATTEMPT% GEQ %MAX_ATTEMPTS_LOG (
+        echo ❌ build-log.txt пустой после ожидания
+        pause
+        exit /b
+    )
+    echo ⏳ build-log.txt пустой, ждём %WAIT_LOG% секунд...
+    timeout /t %WAIT_LOG% >nul
+    goto WAIT_LOG_FILE
 )
 
-REM Выводим лог в терминал
+echo ✅ build-log.txt загружен и не пустой
+echo.
+echo ⏬ Лог сборки:
 type build-log.txt
 
 pause
