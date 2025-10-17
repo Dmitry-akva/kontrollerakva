@@ -32,7 +32,7 @@ echo GitHub Actions соберёт и обновит релиз.
 echo ===============================
 echo.
 
-REM === 4. Ждём 30 секунд для старта workflow ===
+REM === 4. Ждём 30 секунд, чтобы workflow успел стартовать ===
 echo ⏳ Ждём 30 секунд, чтобы workflow успел стартовать...
 timeout /t 30 >nul
 
@@ -69,8 +69,8 @@ if "%STATUS%"=="in_progress" (
 echo ✅ Workflow завершён со статусом: %CONCLUSION%
 echo.
 
-REM === 7. Скачиваем лог и сразу выводим в терминал ===
+REM === 7. Сохраняем лог в build-log.txt и выводим сразу в терминал ===
 echo ⏬ Выводим лог сборки прямо в терминал:
-gh run view %RUN_ID% --log
+gh run view %RUN_ID% --log | tee build-log.txt
 
 pause
