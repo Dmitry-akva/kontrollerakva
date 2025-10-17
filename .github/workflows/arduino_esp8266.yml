@@ -75,7 +75,7 @@ jobs:
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
             --export-binaries \
-            --verbose ./Blink/Blink.ino 2>&1 | tee build-log.txt
+            --verbose ./Blink/Blink.ino 2>&1 | tee raw-log.txt
 
           echo "==============================" > build-log.txt
           echo "📦 Использованные библиотеки:" >> build-log.txt
