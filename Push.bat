@@ -10,8 +10,6 @@ set TAG=v1.0.0
 set WAIT_LOG=10
 set MAX_ATTEMPTS_LOG=60  REM хватит на компиляцию
 
-REM === 0. Удаляем старый лог, если он есть ===
-if exist build-log.txt del /f /q build-log.txt
 
 REM === 1. Git add + commit + push + форс тег ===
 git add .

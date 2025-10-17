@@ -21,7 +21,7 @@ DeviceAddress temperatureSensors[3]; // размер массива опреде
 
 GTimer<millis> TimerCount; 
 
-String ver = "ztim";
+String ver = "zim";
 
 uint8_t deviceCount = 0;
 volatile bool res = 0;
