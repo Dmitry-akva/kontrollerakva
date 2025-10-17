@@ -78,7 +78,7 @@ jobs:
 
       # 9. Компиляция скетча Blink
       - name: Compile Blink sketch
-          run: |
+        run: |
             ./bin/arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
@@ -93,7 +93,7 @@ jobs:
 
       # 11. Проверка файлов
       - name: List build files
-          run: |
+        run: |
             echo "Files to be included in release:"
             ls -la ./build/esp8266/*.bin
             ls -la ./build/esp8266/*.elf
