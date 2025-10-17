@@ -52,10 +52,15 @@ jobs:
       # 7. Установка локальных библиотек проекта
       - name: Install project libraries
         run: |
-          mkdir -p ~/Arduino/libraries
-          if [ -d ./libraries ]; then
-            cp -r ./libraries/* ~/Arduino/libraries/
-          fi
+          arduino-cli lib update-index
+          arduino-cli lib install "FastBot"
+          arduino-cli lib install "OneWire"
+          arduino-cli lib install "DallasTemperature"
+          arduino-cli lib install "FileData"
+          arduino-cli lib install "LittleFS"
+          arduino-cli lib install "GyverPortal"
+          arduino-cli lib install "GyverHC595"
+          arduino-cli lib install "GTimer"
 
       # 8. Очистка папки build
       - name: Clean build folder
