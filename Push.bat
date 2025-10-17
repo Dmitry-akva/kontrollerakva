@@ -10,7 +10,7 @@ REM === Настройки ===
 set TAG=v1.0.0
 set WORKFLOW_NAME=Build ESP8266 Sketch
 set WAIT_TIME=20
-set MAX_ATTEMPTS=20
+set MAX_ATTEMPTS=30
 set WAIT_LOG=5
 set MAX_ATTEMPTS_LOG=20
 
@@ -34,7 +34,7 @@ echo SHA коммита: %COMMIT_SHA%
 echo Commit date: %COMMIT_DATE%
 echo.
 
-REM === 5. Ждём workflow, связанный с этим коммитом (по дате и времени) ===
+REM === 5. Ждём workflow, связанный с этим коммитом (по дате) ===
 set ATTEMPT=0
 :WAIT_WORKFLOW
 set /a ATTEMPT+=1
@@ -62,22 +62,19 @@ REM === 6. Ждём полного завершения workflow ===
 set STATUS=
 for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status -q ".status"') do set STATUS=%%i
 
-if "%STATUS%"=="in_progress" (
+if NOT "%STATUS%"=="completed" (
     echo ⏳ Workflow выполняется, ждём %WAIT_TIME% секунд...
     timeout /t %WAIT_TIME% >nul
     goto WAIT_COMPLETION
 )
 
-if "%STATUS%"=="queued" (
-    echo ⏳ Workflow ещё в очереди, ждём %WAIT_TIME% секунд...
-    timeout /t %WAIT_TIME% >nul
-    goto WAIT_COMPLETION
-)
-
-echo ✅ Workflow завершён.
+REM === Проверяем результат выполнения workflow ===
+set CONCL=
+for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json conclusion -q ".conclusion"') do set CONCL=%%i
+echo ✅ Workflow завершён со статусом: %CONCL%
 echo.
 
-REM === 7. Скачиваем build-log.txt из релиза и ждём пока он не станет непустым ===
+REM === 7. Скачиваем build-log.txt из релиза после завершения workflow ===
 set ATTEMPT_LOG=0
 :WAIT_LOG
 set /a ATTEMPT_LOG+=1
