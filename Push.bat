@@ -32,15 +32,15 @@ echo GitHub Actions соберёт и обновит релиз.
 echo ===============================
 echo.
 
-REM === 4. Ждём 15 секунд для старта workflow ===
-echo ⏳ Ждём, чтобы workflow успел стартовать...
-timeout /t 15 >nul
+REM === 4. Получаем SHA коммита по тегу ===
+for /f %%i in ('git rev-parse %TAG%') do set TAG_SHA=%%i
+echo 🔹 SHA коммита для тега %TAG%: %TAG_SHA%
 
-REM === 5. Получаем ID workflow по тегу ===
+REM === 5. Ждём появления workflow на этом коммите ===
 :WAIT_WORKFLOW
 set RUN_ID=
 for /f "tokens=*" %%i in (
-    'gh run list --workflow "%WORKFLOW_NAME%" --limit 10 --json databaseId,headBranch -q ".[] | select(.headBranch==\"%TAG%\").databaseId"'
+    'gh run list --workflow "%WORKFLOW_NAME%" --limit 10 --json databaseId,headSha -q ".[] | select(.headSha==\"%TAG_SHA%\").databaseId"'
 ) do set RUN_ID=%%i
 
 if "%RUN_ID%"=="" (
