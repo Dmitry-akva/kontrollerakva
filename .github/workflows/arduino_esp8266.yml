@@ -71,6 +71,7 @@ jobs:
             --build-path ./build/esp8266 \
             --build-cache-path ./build/cache \
             --export-binaries \
+            --export-hex \
             ./Blink
 
       # 10. Проверка созданных файлов
