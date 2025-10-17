@@ -37,10 +37,17 @@ REM === 4. Ждём появления workflow ===
 echo ⏳ Ждём старт workflow...
 timeout /t %WAIT_TIME% >nul
 
-REM Получаем ID последнего workflow для указанного тега
+REM 1. Получаем ID последнего workflow для тега
 for /f "tokens=*" %%i in ('gh run list --workflow "Build ESP8266 Sketch" --branch refs/tags/%TAG% --limit 1 --json databaseId -q ".[0].databaseId"') do set RUN_ID=%%i
 
-REM Ждём завершения workflow
+REM 2. Проверяем, что нашли ID
+if "%RUN_ID%"=="" (
+    echo ❌ Workflow для тега %TAG% не найден
+    pause
+    exit /b
+)
+
+REM 3. Ждём завершения workflow
 :WAIT_COMPLETION
 for /f "tokens=*" %%i in ('gh run view %RUN_ID% --json status,conclusion -q ".status + \",\" + .conclusion"') do set STATUS_CONC=%%i
 for /f "tokens=1,2 delims=," %%a in ("%STATUS_CONC%") do (
@@ -54,18 +61,10 @@ if "%STATUS%"=="in_progress" (
     goto WAIT_COMPLETION
 )
 
-echo Workflow завершён со статусом: %CONCLUSION%echo.
+echo Workflow завершён со статусом: %CONCLUSION%
 
-REM === 6. Скачиваем лог в файл и выводим в терминал ===
-echo ⏬ Получаем лог сборки...
+REM 4. Скачиваем и выводим лог
 gh run view %RUN_ID% --log > build-log.txt
-
-echo.
-echo ===============================
-echo ✅ Лог сборки сохранён в build-log.txt
-echo ===============================
-echo.
-
 type build-log.txt
 
 pause
