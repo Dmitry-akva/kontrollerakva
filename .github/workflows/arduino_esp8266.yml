@@ -70,23 +70,26 @@ jobs:
 
       # 9. Компиляция скетча Blink с экспортом HEX и BIN
       - name: Compile Blink sketch
-        run: |          
+        run: | 
+          arduino-cli board details --fqbn esp8266:esp8266:nodemcuv2 > ./build/board-info.txt         
           arduino-cli compile \
             --fqbn esp8266:esp8266:nodemcuv2 \
             --build-path ./build/esp8266 \
             --export-binaries \
             --verbose ./Blink/Blink.ino 2>&1 | tee raw-log.txt
+         
+          {
+           echo "============================"
+           echo "🏷️  Параметры платы ESP8266:"
+           echo "============================"
+           cat ./build/board-info.txt
+           echo ""
+           echo "============================"
+           echo "📦 Использованные библиотеки и память:"
+           echo "============================"
+           grep -E "^(Used library|Used platform|Global variables|Code|. Variables|IRAM|IROM|BSS|DATA|RODATA)" ./build/raw-log.txt || true
+          } > ./build-log.txt
 
-          echo "==============================" > build-log.txt
-          echo "📦 Использованные библиотеки:" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          grep -A2 "Using library" raw-log.txt >> build-log.txt
-
-          echo "" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          echo "💾 Отчёт о памяти:" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          grep -E "used [0-9]+ / [0-9]+ bytes" raw-log.txt >> build-log.txt
 
       # 10. Проверка созданных файлов
       - name: List build files
