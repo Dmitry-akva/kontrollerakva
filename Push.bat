@@ -25,11 +25,10 @@ git tag -f %TAG%
 git push origin main
 git push origin -f %TAG%
 
-REM === 4. Получаем дату и время последнего коммита в ISO 8601 ===
+REM === 4. Получаем дату и SHA последнего коммита ===
 for /f "tokens=*" %%i in ('git log -1 --format="%%cI"') do set COMMIT_DATE=%%i
-echo SHA коммита: 
 for /f "tokens=*" %%i in ('git rev-parse HEAD') do set COMMIT_SHA=%%i
-echo %COMMIT_SHA%
+echo SHA коммита: %COMMIT_SHA%
 echo Commit date: %COMMIT_DATE%
 echo.
 
@@ -76,7 +75,7 @@ if "%STATUS%"=="queued" (
 echo ✅ Workflow завершён.
 echo.
 
-REM === 7. Сохраняем лог в build-log.txt и выводим сразу в терминал ===
+REM === 7. Сохраняем лог и выводим в терминал ===
 echo ⏬ Выводим лог сборки прямо в терминал:
 gh run view %RUN_ID% --log > build-log.txt
 type build-log.txt
