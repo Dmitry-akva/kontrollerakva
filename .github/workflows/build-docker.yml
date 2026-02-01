@@ -26,7 +26,7 @@ jobs:
       # 3️⃣ Сборка Docker-образа с PlatformIO и ESP8266
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/dmitry-akva/esp8266-platformio:latest
+          docker build -t ghcr.io/dmitry-akva/esp8266-platformio:latest .
 
       # 4️⃣ Публикация образа в GHCR
       - name: Push Docker image to GHCR
