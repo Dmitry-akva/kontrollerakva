@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Сборка Docker-образа
       - name: Build Docker image
@@ -25,7 +25,7 @@ jobs:
 
       # Загружаем готовую прошивку как артефакт
       - name: Upload Firmware
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: firmware
           path: .pio/build/nodemcuv2/firmware.bin
