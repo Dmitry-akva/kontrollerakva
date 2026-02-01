@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  docker-build:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # Сборка Docker-образа
       - name: Build Docker image
@@ -21,9 +21,12 @@ jobs:
       # Компиляция прошивки внутри контейнера
       - name: Build firmware
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace esp8266-platformio:latest bash -c "pio run -j 4"
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            esp8266-platformio:latest \
+            bash -c "pio run -j 4"
 
-      # Загружаем готовую прошивку как артефакт
+      # Загрузка прошивки как артефакт
       - name: Upload Firmware
         uses: actions/upload-artifact@v4
         with:
