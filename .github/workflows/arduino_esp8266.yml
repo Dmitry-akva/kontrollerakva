@@ -1,114 +1,31 @@
-name: Build ESP8266 Sketch
+name: Build Docker + ESP8266 Firmware
 
 on:
   push:
-    tags: ['v*']  # workflow запускается только на теги v*
-
-permissions:
-  contents: write  # нужно для создания/обновления релиза
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  build:
+  docker-build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout репозитория
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2. Установка Arduino CLI через официальный Action
-      - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v2
-        with:
-          version: 1.3.1
+      # Сборка Docker-образа
+      - name: Build Docker image
+        run: docker build -t esp8266-platformio:latest .
 
-      # 3. Проверка установки Arduino CLI
-      - name: Check Arduino CLI
-        run: arduino-cli version
-
-      # 4. Кэш ESP8266 core
-      - name: Cache ESP8266 platform
-        id: cache-esp8266-core
-        uses: actions/cache@v3
-        with:
-          path: ~/.arduino15/packages/esp8266
-          key: esp8266-core-Linux-v3.1.2
-
-      # 5. Установка ESP8266 core (только если кэш не сработал)
-      - name: Install ESP8266 core
-        if: steps.cache-esp8266-core.outputs.cache-hit != 'true'
+      # Компиляция прошивки внутри контейнера
+      - name: Build firmware
         run: |
-          arduino-cli config init --additional-urls http://arduino.esp8266.com/stable/package_esp8266com_index.json
-          arduino-cli core update-index
-          arduino-cli core install esp8266:esp8266@3.1.2
+          docker run --rm -v ${{ github.workspace }}:/workspace esp8266-platformio:latest bash -c "pio run -j 4"
 
-      # 6. Кэш библиотек Arduino
-      - name: Cache Arduino libraries
-        uses: actions/cache@v3
+      # Загружаем готовую прошивку как артефакт
+      - name: Upload Firmware
+        uses: actions/upload-artifact@v3
         with:
-          path: ~/Arduino/libraries
-          key: arduino-libraries-${{ hashFiles('**/*.ino', '**/library.properties') }}
-
-      # 7. Установка локальных библиотек проекта
-      - name: Install project libraries
-        run: |
-          arduino-cli lib update-index
-          arduino-cli lib install "FastBot"
-          arduino-cli lib install "OneWire"
-          arduino-cli lib install "DallasTemperature"
-          arduino-cli lib install "FileData"
-          
-          arduino-cli lib install "GyverPortal"
-          arduino-cli lib install "GyverHC595"
-          arduino-cli lib install "GTimer"
-
-      # 8. Очистка папки build
-      - name: Clean build folder
-        run: |
-          rm -rf ./build
-          mkdir -p ./build/esp8266
-
-      # 9. Компиляция скетча Blink с экспортом HEX и BIN
-      - name: Compile Blink sketch
-        run: |                    
-          arduino-cli compile \
-            --fqbn esp8266:esp8266:nodemcuv2 \
-            --build-path ./build/esp8266 \
-            --export-binaries \
-            --verbose ./Blink/Blink.ino 2>&1 | tee raw-log.txt
-
-          echo "==============================" > build-log.txt
-          echo "📦 Использованные библиотеки:" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          grep -A2 "Using library" raw-log.txt >> build-log.txt
-
-          echo "" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          echo "💾 Отчёт о памяти:" >> build-log.txt
-          echo "==============================" >> build-log.txt
-          grep -E "used [0-9]+ / [0-9]+ bytes" raw-log.txt >> build-log.txt
-          arduino-cli board details --fqbn esp8266:esp8266:nodemcuv2 >> build-log.txt || true
-
-      # 10. Проверка созданных файлов
-      - name: List build files
-        run: ls -la ./build/esp8266/
-
-      # 11. Создание zip архива build для релиза
-      - name: Zip build folder
-        run: |
-          cd ./build
-          zip -r esp8266-build.zip esp8266
-
-      # 12. Создание или обновление Release на GitHub
-      - name: Create or Update Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            ./build/esp8266/*.bin
-            ./build/esp8266/*.elf
-            ./build/esp8266/*.map
-            ./build/esp8266-build.zip
-            ./build-log.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: firmware
+          path: .pio/build/nodemcuv2/firmware.bin
