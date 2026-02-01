@@ -26,17 +26,17 @@ jobs:
       # 3️⃣ Сборка Docker-образа с PlatformIO и ESP8266
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/esp8266-platformio:latest .
+          docker build -t ghcr.io/dmitry-akva/esp8266-platformio:latest
 
       # 4️⃣ Публикация образа в GHCR
       - name: Push Docker image to GHCR
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/esp8266-platformio:latest
+          docker push ghcr.io/dmitry-akva/esp8266-platformio:latest
 
       # 5️⃣ Сборка прошивки внутри контейнера
       - name: Build firmware
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace ghcr.io/${{ github.repository_owner }}/esp8266-platformio:latest pio run -j 4
+          docker run --rm -v ${{ github.workspace }}:/workspace ghcr.io/dmitry-akva/esp8266-platformio:latest pio run -j 4
 
       # 6️⃣ Загружаем скомпилированную прошивку как артефакт
       - name: Upload firmware binary
