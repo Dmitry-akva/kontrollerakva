@@ -1,4 +1,4 @@
-# Используем легкую Ubuntu
+# Dockerfile для ESP8266 + PlatformIO
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -9,15 +9,15 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     build-essential \
-    wget \
     curl \
+    wget \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка PlatformIO
 RUN pip3 install --no-cache-dir platformio
 
-# Создаем рабочую папку
+# Рабочая директория
 WORKDIR /workspace
 
 CMD ["/bin/bash"]
