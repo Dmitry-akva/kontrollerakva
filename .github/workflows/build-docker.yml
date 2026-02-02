@@ -7,9 +7,6 @@ on:
     paths:
       - 'src/**'
       - 'lib/**'
-      - 'platformio.ini'
-      - 'Dockerfile'
-      - '.github/workflows/**'
   workflow_dispatch:
 
 jobs:
