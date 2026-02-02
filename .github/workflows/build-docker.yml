@@ -21,7 +21,7 @@ jobs:
       # 1️⃣ Собираем Docker-образ PlatformIO
       - name: Build offline Docker image
         run: |
-          docker build -t ghcr.io/dmitry-akva/esp8266-platformio-offline:latest -f Dockerfile.offline .
+          docker build -t ghcr.io/dmitry-akva/esp8266-platformio-offline:latest -f Dockerfile .
 
       # 2️⃣ Публикуем образ на GHCR
       - name: Push offline Docker image
