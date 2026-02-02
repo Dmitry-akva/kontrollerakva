@@ -1,4 +1,4 @@
-name: Build Offline Docker + ESP8266 Firmware
+name: Build Fully Offline Docker + ESP8266 Firmware
 
 on:
   workflow_dispatch:  # только ручной запуск
@@ -25,34 +25,26 @@ jobs:
         run: |
           docker build -t temp-pio-cache:latest .
 
-      # 4️⃣ Запуск контейнера для сборки прошивки и кэша
-      - name: Build firmware inside temp container
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            temp-pio-cache:latest \
-            pio run -j 4
-
-      # 5️⃣ Копируем PlatformIO кэш в local_cache
-      - name: Export PlatformIO cache
+      # 4️⃣ Запуск временного контейнера для сборки прошивки и кэша
+      - name: Build firmware and cache in temp container
         run: |
           mkdir -p local_cache
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             temp-pio-cache:latest \
-            bash -c "cp -r /root/.platformio /workspace/local_cache/.platformio"
+            bash -c "pio run -j 4 && cp -r /root/.platformio /workspace/local_cache/.platformio"
 
-      # 6️⃣ Сборка автономного Docker-образа
+      # 5️⃣ Сборка окончательного автономного Docker-образа
       - name: Build offline Docker image
         run: |
           docker build -t ghcr.io/dmitry-akva/esp8266-platformio-offline:latest -f Dockerfile.offline .
 
-      # 7️⃣ Публикация автономного образа на GHCR
+      # 6️⃣ Публикация автономного образа на GHCR
       - name: Push offline Docker image
         run: |
           docker push ghcr.io/dmitry-akva/esp8266-platformio-offline:latest
 
-      # 8️⃣ Сборка прошивки внутри оффлайн-образа
+      # 7️⃣ Сборка прошивки внутри оффлайн-образа (опционально)
       - name: Build firmware offline
         run: |
           docker run --rm \
@@ -60,7 +52,7 @@ jobs:
             ghcr.io/dmitry-akva/esp8266-platformio-offline:latest \
             pio run -j 4
 
-      # 9️⃣ Загрузка прошивки как артефакт
+      # 8️⃣ Загрузка прошивки как артефакт
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
