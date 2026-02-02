@@ -1,4 +1,3 @@
-# Используем минимальный Python для PlatformIO
 FROM python:3.11-slim
 
 # Устанавливаем зависимости для сборки прошивки
@@ -9,11 +8,10 @@ RUN apt-get update && \
 # Установка PlatformIO
 RUN pip install platformio
 
-# Копируем кэш PlatformIO (платформы, тулчейны, библиотеки) из workflow
+# Копируем кэш PlatformIO из workflow
 COPY local_cache/.platformio /root/.platformio
 
 # Рабочая папка для проекта
 WORKDIR /workspace
 
-# По умолчанию запускаем bash
 CMD ["bash"]
