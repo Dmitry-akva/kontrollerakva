@@ -1,16 +1,10 @@
-name: Build Docker + ESP8266 Firmware
+name: Build Offline Docker + ESP8266 Firmware
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/**'
-      - 'lib/**'
-  workflow_dispatch:
+  workflow_dispatch:  # только ручной запуск
 
 jobs:
-  docker:
+  build-offline-docker:
     runs-on: ubuntu-latest
 
     steps:
@@ -18,17 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Кеш PlatformIO (библиотеки, тулчейны, фреймворки)
-      - name: Cache PlatformIO
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.platformio
-          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            pio-${{ runner.os }}-
-
-      # 3️⃣ Логинимся в GitHub Container Registry
+      # 2️⃣ Логинимся в GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -36,48 +20,47 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 4️⃣ Включаем Docker Buildx (нужно для кеша)
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # 5️⃣ Кеш Docker слоёв
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: docker-${{ runner.os }}-${{ hashFiles('Dockerfile') }}
-          restore-keys: |
-            docker-${{ runner.os }}-
-
-      # 6️⃣ Сборка Docker-образа с кешем
-      - name: Build Docker image
+      # 3️⃣ Сборка временного Docker-образа с PlatformIO
+      - name: Build temporary Docker image
         run: |
-          docker buildx build \
-            --cache-from=type=local,src=/tmp/.buildx-cache \
-            --cache-to=type=local,dest=/tmp/.buildx-cache-new,mode=max \
-            -t ghcr.io/dmitry-akva/esp8266-platformio:latest \
-            --load .
+          docker build -t temp-pio-cache:latest .
 
-      # 7️⃣ Обновляем кеш Docker
-      - name: Move Docker cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-      # 8️⃣ Публикация образа в GHCR
-      - name: Push Docker image to GHCR
-        run: docker push ghcr.io/dmitry-akva/esp8266-platformio:latest
-
-      # 9️⃣ Сборка прошивки внутри контейнера (с кешем PlatformIO)
-      - name: Build firmware
+      # 4️⃣ Запуск контейнера для сборки прошивки и кэша
+      - name: Build firmware inside temp container
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
-            -v ~/.platformio:/root/.platformio \
-            ghcr.io/dmitry-akva/esp8266-platformio:latest \
+            temp-pio-cache:latest \
             pio run -j 4
 
-      # 🔟 Загружаем прошивку как артефакт
+      # 5️⃣ Копируем PlatformIO кэш в local_cache
+      - name: Export PlatformIO cache
+        run: |
+          mkdir -p local_cache
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            temp-pio-cache:latest \
+            bash -c "cp -r /root/.platformio /workspace/local_cache/.platformio"
+
+      # 6️⃣ Сборка автономного Docker-образа
+      - name: Build offline Docker image
+        run: |
+          docker build -t ghcr.io/dmitry-akva/esp8266-platformio-offline:latest -f Dockerfile.offline .
+
+      # 7️⃣ Публикация автономного образа на GHCR
+      - name: Push offline Docker image
+        run: |
+          docker push ghcr.io/dmitry-akva/esp8266-platformio-offline:latest
+
+      # 8️⃣ Сборка прошивки внутри оффлайн-образа
+      - name: Build firmware offline
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            ghcr.io/dmitry-akva/esp8266-platformio-offline:latest \
+            pio run -j 4
+
+      # 9️⃣ Загрузка прошивки как артефакт
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
