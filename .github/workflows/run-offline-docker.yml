@@ -1,6 +1,8 @@
 name: Build Firmware (Offline Docker)
+
+# События, на которые реагирует workflow
 on:
-  workflow_dispatch:  # ручной запуск
+  workflow_dispatch:  # кнопка Run workflow
   push:
     paths:
       - 'src/**'
@@ -11,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 0️⃣ Получаем код репозитория — очень важно
+      # 1️⃣ Чекаутим репозиторий (обязательный для доступа к коду и platformio.ini)
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1️⃣ Логинимся в GHCR (если образ приватный)
+      # 2️⃣ Логинимся в GHCR, если Docker образ приватный
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -23,17 +25,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ (опционально) Вывести содержимое workspace для отладки
-      - name: Debug: list workspace
+      # 3️⃣ (опционально) Проверка содержимого репозитория перед сборкой
+      - name: Debug: list repository root
         run: |
           echo "GITHUB_WORKSPACE = ${{ github.workspace }}"
           ls -la ${{ github.workspace }}
 
-      # 3️⃣ Сборка прошивки полностью оффлайн внутри контейнера
+      # 4️⃣ Сборка прошивки внутри offline Docker образа
       - name: Build firmware inside offline container
-        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline pio run -v -j 4
+        run: docker run --rm \
+          -v ${{ github.workspace }}:/workspace \
+          -w /workspace \
+          ghcr.io/dmitry-akva/esp8266-platformio:offline \
+          pio run -v -j 4
 
-      # 4️⃣ Загружаем бинарник прошивки как артефакт Actions
+      # 5️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
