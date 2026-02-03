@@ -1,14 +1,14 @@
-name: Build Offline Docker Image
+name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:   # ручной запуск
+  workflow_dispatch:  # ручной запуск
   push:
     paths:
+      - 'src/**'
       - 'platformio.ini'
-      - 'Dockerfile'
 
 jobs:
-  build-image:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 1️⃣ Log in to GitHub Container Registry
+      # 1️⃣ Log in to GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -24,25 +24,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ Compute PIO hash and lowercase repo name
-      - name: Compute PIO hash
-        id: piohash
+      # 2️⃣ Определяем образ для оффлайн-билда
+      - name: Set Docker image
+        id: image
         run: |
-          # Хэш platformio.ini для тега
-          echo "hash=$(sha256sum platformio.ini | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          # Имя репозитория в нижний регистр
-          echo "repo=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          REPO_LOWER=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')
+          TAG=fd0ca40b34a3c1dc48fd245b70f37ec3bb2394accaa28889b591fe7bf4e53a32  # пример тега
+          IMAGE=ghcr.io/$REPO_LOWER/esp8266-platformio:$TAG
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
 
-      # 3️⃣ Build Docker image
-      - name: Build Docker image
+      # 3️⃣ Сборка прошивки внутри оффлайн-контейнера
+      - name: Build firmware inside offline container
         run: |
-          IMAGE=ghcr.io/${{ steps.piohash.outputs.repo }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
-          echo "Building image $IMAGE"
-          docker build -t $IMAGE .
+          echo "Using Docker image: ${{ steps.image.outputs.image }}"
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            "${{ steps.image.outputs.image }}" \
+            pio run -v -j 4
 
-      # 4️⃣ Push Docker image to GHCR
-      - name: Push Docker image to GHCR
-        run: |
-          IMAGE=ghcr.io/${{ steps.piohash.outputs.repo }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
-          echo "Pushing image $IMAGE"
-          docker push $IMAGE
+      # 4️⃣ Загружаем бинарник прошивки как артефакт Actions
+      - name: Upload firmware binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/nodemcuv2/firmware.bin
