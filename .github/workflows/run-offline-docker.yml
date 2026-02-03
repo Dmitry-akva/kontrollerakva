@@ -22,11 +22,12 @@ jobs:
 
       # 2️⃣ Сборка прошивки полностью оффлайн внутри контейнера
       - name: Build firmware inside offline container
-        run: docker run --rm \
+        run: |
+          bash -c "docker run --rm \
           -v ${{ github.workspace }}:/workspace \
           -w /workspace \
           ghcr.io/dmitry-akva/esp8266-platformio:offline \
-          pio run -v -j 4
+          pio run -v -j 4"
 
       # 3️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
