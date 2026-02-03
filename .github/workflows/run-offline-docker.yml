@@ -9,11 +9,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # стандартный GitHub runner
+    runs-on: ubuntu-latest
 
     steps:
-      
-      # 2️⃣ Логинимся в GHCR (если образ приватный)
+      # 1️⃣ Логинимся в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -21,15 +20,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Сборка прошивки полностью оффлайн внутри контейнера
-      - name: Build firmware inside Docker
-        run: docker run --rm \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace \
-          ghcr.io/dmitry-akva/esp8266-platformio:offline \
-          pio run -v -j 4
-
-      # 4️⃣ Загружаем бинарник прошивки как артефакт
+      # 2️⃣ Сборка прошивки полностью оффлайн внутри контейнера
+      - name: Build firmware inside offline container
+        run: |
+          docker run --rm \
+            ghcr.io/dmitry-akva/esp8266-platformio:offline \
+            pio run -v -j 4
+      # 3️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
