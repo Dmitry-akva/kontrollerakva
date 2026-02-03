@@ -1,29 +1,26 @@
 name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # ручной запуск
   push:
     paths:
       - 'src/**'
       - 'platformio.ini'
 
 env:
-  IMAGE_TAG: "offline-libs"
+  IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:latest  # тег образа
+  PIO_ENV: nodemcuv2  # окружение PlatformIO
 
 jobs:
-
-  # ================================
-  # 1️⃣ Сборка Docker-образа с кешем
-  # ================================
-  build-docker-image:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      # 1️⃣ Проверка исходного кода
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
+      # 2️⃣ Логинимся в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -31,49 +28,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build Docker image
-        id: build-image
-        run: |
-          IMAGE=ghcr.io/${{ github.repository_owner }}/esp8266-platformio:${IMAGE_TAG}
-          echo "Building image $IMAGE"
-          docker build -t $IMAGE .
-          docker push $IMAGE
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
-
-  # ====================================
-  # 2️⃣ Сборка прошивки в оффлайн-контейнере
-  # ====================================
-  build-firmware:
-    needs: build-docker-image
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
+      # 3️⃣ Сборка прошивки внутри offline контейнера
       - name: Build firmware inside offline container
         run: |
-          IMAGE=${{ needs.build-docker-image.outputs.image }}
           mkdir -p build_out
-
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -v ${{ github.workspace }}/build_out:/out \
             -w /workspace \
-            "$IMAGE" \
+            $IMAGE \
             bash -lc "\
               set -euo pipefail; \
-              echo '=== Listing preloaded libdeps in image ==='; ls -la /opt/pio-libdeps || true; \
-              echo '=== Listing global PlatformIO cache ==='; ls -la /opt/pio-cache/.platformio || true; \
+              echo '=== LIST /opt/pio-libdeps in image ==='; ls -la /opt/pio-libdeps || true; \
+              echo '=== LIST /opt/pio-cache in image (global .platformio) ==='; ls -la /opt/pio-cache || true; \
               echo '=== Project libdeps BEFORE copy ==='; ls -la .pio/libdeps || true; \
-              # copy preloaded libs for all envs \
+              # Копируем все предзагруженные env-папки в .pio/libdeps \
               if [ -d /opt/pio-libdeps ]; then \
                 mkdir -p .pio/libdeps; \
                 for d in /opt/pio-libdeps/*; do \
@@ -82,17 +51,18 @@ jobs:
                   fi; \
                 done; \
               fi; \
-              # copy global cache if exists \
+              # Копируем глобальный кеш PlatformIO \
               if [ -d /opt/pio-cache/.platformio ]; then \
                 mkdir -p /root/.platformio; cp -a /opt/pio-cache/.platformio/* /root/.platformio/ 2>/dev/null || true; \
               fi; \
               echo '=== Project libdeps AFTER copy ==='; ls -la .pio/libdeps || true; \
-              # build firmware \
-              pio run -v -j 4; \
-              # copy binaries out \
-              mkdir -p /out; cp .pio/build/*/*.bin /out/ 2>/dev/null || true; cp .pio/build/*/*.hex /out/ 2>/dev/null || true; \
+              # Собираем прошивку \
+              pio run -e $PIO_ENV -v -j 4; \
+              # Копируем бинарники наружу \
+              mkdir -p /out; cp .pio/build/$PIO_ENV/*.bin /out/ 2>/dev/null || true; cp .pio/build/$PIO_ENV/*.hex /out/ 2>/dev/null || true; \
             "
 
+      # 4️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
