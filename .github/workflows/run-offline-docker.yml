@@ -1,34 +1,39 @@
-name: Build Firmware Online via Browser
+name: Build Firmware (OFFLINE Docker)
 
 on:
-  workflow_dispatch:  # позволяет запускать вручную через GitHub UI
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+      - 'lib/**'
+      - 'platformio.ini'
 
 jobs:
-  build-firmware:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Логинимся в GHCR
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Запуск Docker контейнера и сборка прошивки
-      - name: Build firmware inside offline Docker
+      - name: Pull offline Docker image
+        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline
+
+      - name: Build firmware inside offline container
         run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio-offline:latest \
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -j 4
 
-      # 4️⃣ Загрузка прошивки как артефакт (скачать через браузер)
-      - name: Upload firmware binary
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware
