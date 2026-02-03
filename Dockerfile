@@ -1,22 +1,23 @@
 FROM python:3.11-slim
 
-# ⚙️ Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y git build-essential ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ⚡ Устанавливаем PlatformIO
 RUN pip install --no-cache-dir platformio
 
-# 🗂 Рабочая папка для проекта
-WORKDIR /workspace
+# 👉 Папка для предзагрузки зависимостей
+WORKDIR /opt/pio-preload
 
-# 📂 Копируем проект и библиотеки (lib уже в репозитории)
-COPY platformio.ini ./
-COPY src ./src
-COPY lib ./lib
+# Копируем только platformio.ini
+COPY platformio.ini .
 
-# 💾 Кэшируем PlatformIO (платформы, тулчейны, библиотеки)
+# Создаём фиктивный src, который подключает ВСЕ библиотеки
+RUN mkdir src && printf '#include <Arduino.h>\n#include <FastBot.h>\n#include <OneWire.h>\n#include <DallasTemperature.h>\n#include <FileData.h>\n#include <GyverPortal.h>\n#include <GyverHC595.h>\n#include <GTimer.h>\nvoid setup(){}\nvoid loop(){}\n' > src/main.cpp
+
+# 👉 Это заставит PlatformIO скачать ВСЕ библиотеки и тулчейны
 RUN pio run || true
 
-# 🔧 Командная оболочка для запуска сборки вручную
+# Возвращаем рабочую папку для реальных сборок
+WORKDIR /workspace
+
 CMD ["bash"]
