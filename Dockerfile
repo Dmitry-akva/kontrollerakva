@@ -1,30 +1,23 @@
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y \
-    git build-essential ca-certificates curl \
+# ⚙️ Системные зависимости
+RUN apt-get update && apt-get install -y git build-essential ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
+# ⚡ Устанавливаем PlatformIO
 RUN pip install --no-cache-dir platformio
 
-ENV PLATFORMIO_CORE_DIR=/root/.platformio
-
-# Временный проект для прогрева кэша
-WORKDIR /tmp/project
+# 🗂 Рабочая папка
+WORKDIR /workspace
 
 COPY platformio.ini ./
 COPY src ./src
 COPY lib ./lib
 
-# 🔥 Полная сборка проекта = кэш платформ + библиотек
-RUN pio run -e nodemcuv2
+# ⚡ Кэшируем платформы и тулчейны
+RUN pio platform install espressif8266@4.2.1 --with-package toolchain-xtensa@2.100300.220621 --with-package framework-arduinoespressif8266@3.30102.0
 
-# 👉 Сохраняем проектные зависимости отдельно
-RUN mkdir -p /opt/pio-deps && cp -r .pio/libdeps /opt/pio-deps
-
-# Рабочая папка для реальной сборки
-WORKDIR /workspace
-
-# При запуске контейнера подсовываем уже скачанные библиотеки
-ENV PLATFORMIO_LIBDEPS_DIR=/opt/pio-deps
+# ⚡ Прогрев кэша библиотек
+RUN pio lib install --offline
 
 CMD ["bash"]
