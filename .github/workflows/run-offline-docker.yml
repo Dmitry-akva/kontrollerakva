@@ -1,11 +1,10 @@
-name: Build Firmware (Offline Docker, Cached)
+name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:   # Можно запускать вручную
+  workflow_dispatch:  # ручной запуск
   push:
     paths:
       - 'src/**'
-      - 'lib/**'
       - 'platformio.ini'
 
 jobs:
@@ -13,41 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Клонируем репозиторий
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # 2️⃣ Кэш Docker слоёв, чтобы ускорить сборку и pull
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.docker-cache
-          key: ${{ runner.os }}-docker-${{ github.sha }}
-
-      # 3️⃣ Логинимся в GHCR только если нужно подтянуть образ впервые
-      - name: Login to GHCR
-        if: steps.cache-docker-layers.outputs.cache-hit != 'true'
+      # 1️⃣ Логинимся в GHCR (если образ приватный)
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 4️⃣ Pull offline Docker image (если нет локально, иначе используется кэш)
-      - name: Pull offline Docker image
-        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline || true
-
-      # 5️⃣ Сборка прошивки внутри оффлайн контейнера
-      - name: Build firmware inside offline container
+      # 2️⃣ Сборка прошивки в оффлайн Docker контейнере
+      - name: Build firmware
         run: |
           docker run --rm \
-            --network none \
             -v ${{ github.workspace }}:/workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
-            pio run -j 4
+            pio run -v -j 4
 
-      # 6️⃣ Загружаем прошивку как артефакт
-      - name: Upload firmware
+      # 3️⃣ Загружаем бинарник прошивки как артефакт
+      - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
           name: firmware
