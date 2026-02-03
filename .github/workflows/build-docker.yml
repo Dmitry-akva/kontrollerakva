@@ -1,7 +1,7 @@
 name: Build Offline Docker + Firmware
 
 on:
-  workflow_dispatch: # ручной запуск
+  workflow_dispatch:
   push:
     paths:
       - 'src/**'
@@ -25,29 +25,30 @@ jobs:
           git clone https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
           git clone https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
           git clone https://github.com/GyverLibs/GTimer.git lib/GTimer
+          # Arduino Library Manager библиотеки можно скачать и положить в lib/ вручную разово
 
       # 3️⃣ Логинимся в GHCR
-      - name: Login to GHCR
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 4️⃣ Сборка Docker образа с библиотеками
-      - name: Build offline Docker image
+      # 4️⃣ Строим Docker-образ с библиотеками внутри
+      - name: Build Docker image (offline)
         run: |
           docker build -t ghcr.io/dmitry-akva/esp8266-platformio:offline .
 
-      # 5️⃣ Публикация образа в GHCR
-      - name: Push offline Docker image
+      # 5️⃣ Публикуем Docker-образ
+      - name: Push Docker image to GHCR
         run: |
           docker push ghcr.io/dmitry-akva/esp8266-platformio:offline
 
-      # 6️⃣ Сборка прошивки внутри оффлайн контейнера
+      # 6️⃣ Компиляция прошивки внутри образа
       - name: Build firmware inside offline container
         run: |
-          docker run --rm --network none \
+          docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -j 4
