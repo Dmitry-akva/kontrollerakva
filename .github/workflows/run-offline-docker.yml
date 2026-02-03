@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest  # стандартный GitHub runner
 
     steps:
- 
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       # 2️⃣ Логинимся в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
@@ -22,9 +23,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Скачиваем готовый Docker образ с библиотеками
-      - name: Pull offline Docker image
-        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline
+      # 3️⃣ Проверка содержимого репозитория (опционально, для отладки)
+      - name: Debug: list repository root
+        run: |
+          echo "GITHUB_WORKSPACE = ${{ github.workspace }}"
+          ls -la ${{ github.workspace }}
 
       # 4️⃣ Сборка прошивки в контейнере (всё в одной строке!)
       - name: Build firmware inside Docker
