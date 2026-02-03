@@ -1,4 +1,4 @@
-name: Build Firmware (Offline Docker)
+name: Build Firmware (Offline Docker, Editable Code)
 
 on:
   workflow_dispatch:  # ручной запуск
@@ -9,10 +9,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # Используем self-hosted runner для кеша Docker
 
     steps:
-      # 1️⃣ Логинимся в GHCR (если образ приватный)
+      # 1️⃣ Логин в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -20,10 +20,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ Сборка прошивки полностью оффлайн внутри контейнера
+      # 2️⃣ Монтируем проект в Docker и собираем прошивку
       - name: Build firmware inside offline container
         run: |
           docker run --rm \
+            -v ${{ github.workspace }}:/workspace \   # Монтируем весь проект
+            -w /workspace \                            # Рабочая директория
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -v -j 4
 
