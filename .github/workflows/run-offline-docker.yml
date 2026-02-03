@@ -17,14 +17,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Кэшируем Docker слои, чтобы ускорить сборку и pull
+      # 2️⃣ Кэш Docker слоёв, чтобы ускорить сборку и pull
       - name: Cache Docker layers
         uses: actions/cache@v3
         with:
           path: /tmp/.docker-cache
           key: ${{ runner.os }}-docker-${{ github.sha }}
 
-      # 3️⃣ Логинимся в GHCR только если образ нужно подтянуть первый раз
+      # 3️⃣ Логинимся в GHCR только если нужно подтянуть образ впервые
       - name: Login to GHCR
         if: steps.cache-docker-layers.outputs.cache-hit != 'true'
         uses: docker/login-action@v3
@@ -33,16 +33,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 4️⃣ Pull offline Docker image, если нет локально
+      # 4️⃣ Pull offline Docker image (если нет локально, иначе используется кэш)
       - name: Pull offline Docker image
-        run: |
-          docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline || true
+        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline || true
 
-      # 5️⃣ Собираем прошивку внутри контейнера
+      # 5️⃣ Сборка прошивки внутри оффлайн контейнера
       - name: Build firmware inside offline container
         run: |
           docker run --rm \
-            --network none \   # полностью оффлайн
+            --network none \
             -v ${{ github.workspace }}:/workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -j 4
