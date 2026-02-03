@@ -1,0 +1,49 @@
+name: Update Libraries in Repository
+
+on:
+  workflow_dispatch:  # можно запускать вручную
+  # отключаем автозапуск на push в lib, чтобы не было зацикливания
+  push:
+    paths-ignore:
+      - 'lib/**'
+
+jobs:
+  update-libs:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Клонируем репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true  # чтобы workflow мог пушить обратно
+
+      # 2️⃣ Скачиваем библиотеки в папку lib/
+      - name: Download libraries
+        run: |
+          mkdir -p lib
+          # удаляем старые версии
+          rm -rf lib/FileData lib/GyverPortal lib/GyverHC595 lib/GTimer
+          # клонируем актуальные версии
+          git clone https://github.com/GyverLibs/FileData.git lib/FileData
+          git clone https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
+          git clone https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
+          git clone https://github.com/GyverLibs/GTimer.git lib/GTimer
+          # TODO: при необходимости добавить Arduino Library Manager библиотеки через curl/unzip
+
+      # 3️⃣ Проверяем, есть ли изменения
+      - name: Check for changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add lib
+          if git diff --cached --quiet; then
+            echo "No library updates"
+            exit 0
+          fi
+
+      # 4️⃣ Коммитим и пушим обратно в репозиторий
+      - name: Commit and push library updates
+        run: |
+          git commit -m "Update libraries (FileData, GyverPortal, GyverHC595, GTimer)"
+          git push origin HEAD:main
