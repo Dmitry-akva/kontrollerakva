@@ -1,6 +1,4 @@
 name: Build Firmware (Offline Docker)
-
-# События, на которые реагирует workflow
 on:
   workflow_dispatch:  # кнопка Run workflow
   push:
