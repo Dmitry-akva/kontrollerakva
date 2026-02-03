@@ -1,10 +1,10 @@
 name: Build Offline Docker + Update Libraries
 
 on:
-  workflow_dispatch:       # Можно запускать вручную
+  workflow_dispatch:       # ручной запуск
   push:
     paths-ignore:
-      - 'lib/**'          # Чтобы пуш обновлений lib не зацикливался
+      - 'lib/**'          # чтобы пуш обновлений lib не зацикливался
 
 jobs:
   update-libs-and-build:
@@ -17,20 +17,24 @@ jobs:
         with:
           persist-credentials: true
 
-      # 2️⃣ Скачиваем библиотеки в папку lib/
+      # 2️⃣ Скачиваем библиотеки в папку lib/ без внутренних .git
       - name: Download libraries
         run: |
           mkdir -p lib
           rm -rf lib/FileData lib/GyverPortal lib/GyverHC595 lib/GTimer
-          git clone https://github.com/GyverLibs/FileData.git lib/FileData
-          git clone https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
-          git clone https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
-          git clone https://github.com/GyverLibs/GTimer.git lib/GTimer
+          git clone --depth 1 https://github.com/GyverLibs/FileData.git lib/FileData
+          rm -rf lib/FileData/.git
+          git clone --depth 1 https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
+          rm -rf lib/GyverPortal/.git
+          git clone --depth 1 https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
+          rm -rf lib/GyverHC595/.git
+          git clone --depth 1 https://github.com/GyverLibs/GTimer.git lib/GTimer
+          rm -rf lib/GTimer/.git
 
-      # 3️⃣ Коммитим и пушим библиотеки в репозиторий
+      # 3️⃣ Коммитим и пушим библиотеки в репозиторий через PAT
       - name: Commit and push library updates
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}   # PAT с правами repo
+          GH_PAT: ${{ secrets.GH_PAT }}   # Personal Access Token с правами repo
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -42,7 +46,7 @@ jobs:
           git commit -m "Update libraries (FileData, GyverPortal, GyverHC595, GTimer)"
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main
 
-      # 4️⃣ Сборка Docker образа с библиотеками внутри
+      # 4️⃣ Сборка оффлайн Docker образа с библиотеками внутри
       - name: Build offline Docker image
         run: |
           docker build -t ghcr.io/dmitry-akva/esp8266-platformio:offline .
