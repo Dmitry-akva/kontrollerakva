@@ -1,22 +1,30 @@
 FROM python:3.11-slim
 
-# ⚙️ Устанавливаем системные зависимости
-RUN apt-get update && apt-get install -y git build-essential ca-certificates curl \
+RUN apt-get update && apt-get install -y \
+    git build-essential ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ⚡ Устанавливаем PlatformIO
 RUN pip install --no-cache-dir platformio
 
-# 🗂 Рабочая папка для проекта
-WORKDIR /workspace
+ENV PLATFORMIO_CORE_DIR=/root/.platformio
 
-# 📂 Копируем проект и библиотеки (lib уже в репозитории)
+# Временный проект для прогрева кэша
+WORKDIR /tmp/project
+
 COPY platformio.ini ./
 COPY src ./src
 COPY lib ./lib
 
-# 💾 Кэшируем PlatformIO (платформы, тулчейны, библиотеки)
-RUN pio run || true
+# 🔥 Полная сборка проекта = кэш платформ + библиотек
+RUN pio run -e nodemcuv2
 
-# 🔧 Командная оболочка для запуска сборки вручную
+# 👉 Сохраняем проектные зависимости отдельно
+RUN mkdir -p /opt/pio-deps && cp -r .pio/libdeps /opt/pio-deps
+
+# Рабочая папка для реальной сборки
+WORKDIR /workspace
+
+# При запуске контейнера подсовываем уже скачанные библиотеки
+ENV PLATFORMIO_LIBDEPS_DIR=/opt/pio-deps
+
 CMD ["bash"]
