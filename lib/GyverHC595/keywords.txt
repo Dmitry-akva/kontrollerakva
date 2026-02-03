@@ -1,0 +1,34 @@
+#######################################
+# Syntax Coloring Map For GyverHC595
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+GyverHC595	KEYWORD1
+HC595_DELAY	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+read	KEYWORD2
+set	KEYWORD2
+clear	KEYWORD2
+write	KEYWORD2
+setAll	KEYWORD2
+clearAll	KEYWORD2
+writeAll	KEYWORD2
+writeByte	KEYWORD2
+update	KEYWORD2
+buffer	KEYWORD2
+amount	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+HC_PINS	LITERAL1
+HC_SPI	LITERAL1
