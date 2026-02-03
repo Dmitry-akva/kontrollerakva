@@ -1,7 +1,7 @@
 name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:  # ручной запуск
+  workflow_dispatch:
   push:
     paths:
       - 'src/**'
@@ -12,7 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Логинимся в GHCR (если образ приватный)
+      # 1️⃣ Забираем код репозитория
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Логин в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -20,15 +24,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ Сборка прошивки полностью оффлайн внутри контейнера
+      # 3️⃣ Создаём папку для сборочных артефактов снаружи контейнера
+      - name: Prepare build directory
+        run: mkdir -p .pio
+
+      # 4️⃣ Сборка прошивки
       - name: Build firmware inside offline container
         run: |
           docker run --rm \
+            -v ${{ github.workspace }}/src:/workspace/src \
+            -v ${{ github.workspace }}/platformio.ini:/workspace/platformio.ini \
+            -v ${{ github.workspace }}/.pio:/workspace/.pio \
+            -w /workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -v -j 4
-      # 3️⃣ Загружаем бинарник прошивки как артефакт Actions
+
+      # 5️⃣ Проверка что бинарник реально появился
+      - name: List build output
+        run: ls -R .pio/build || true
+
+      # 6️⃣ Загрузка прошивки в артефакты
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: .pio/build/nodemcuv2/firmware.bin
+          path: .pio/build/*/firmware.bin
