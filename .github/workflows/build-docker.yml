@@ -12,11 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 0️⃣ Checkout репозитория
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 1️⃣ Log in to GitHub Container Registry
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -24,25 +22,37 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ Compute PIO hash and lowercase repo name
-      - name: Compute PIO hash
-        id: piohash
+      - name: Compute image tag and lowercase repo
+        id: meta
         run: |
-          # Хэш platformio.ini для тега
-          echo "hash=$(sha256sum platformio.ini | cut -d' ' -f1)" >> $GITHUB_OUTPUT
-          # Имя репозитория в нижний регистр
-          echo "repo=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          # hash для тега (platformio.ini)
+          HASH="$(sha256sum platformio.ini | cut -d' ' -f1)"
+          # приводим имя репозитория к lowercase (docker требует lowercase)
+          REPO_LOWER="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+          echo "repo=$REPO_LOWER" >> $GITHUB_OUTPUT
+          echo "Computed IMAGE: ghcr.io/${REPO_LOWER}/esp8266-platformio:${HASH}"
 
-      # 3️⃣ Build Docker image
-      - name: Build Docker image
+      - name: Build and push Docker image (if missing)
+        env:
+          IMAGE: ghcr.io/${{ steps.meta.outputs.repo }}/esp8266-platformio:${{ steps.meta.outputs.hash }}
         run: |
-          IMAGE=ghcr.io/${{ steps.piohash.outputs.repo }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
-          echo "Building image $IMAGE"
-          docker build -t $IMAGE .
+          echo "Using image: $IMAGE"
+          # Попробуем сначала подтянуть образ — если найден, пропускаем билд
+          if docker pull "$IMAGE"; then
+            echo "Image already exists: $IMAGE"
+            exit 0
+          fi
 
-      # 4️⃣ Push Docker image to GHCR
-      - name: Push Docker image to GHCR
+          echo "Image not found, building: $IMAGE"
+          # Собираем образ (убирай --no-cache чтобы использовать слои кэша)
+          docker build -t "$IMAGE" .
+          echo "Pushing image: $IMAGE"
+          docker push "$IMAGE"
+
+      - name: Show pushed image info
+        if: success()
         run: |
-          IMAGE=ghcr.io/${{ steps.piohash.outputs.repo }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
-          echo "Pushing image $IMAGE"
-          docker push $IMAGE
+          IMAGE=ghcr.io/${{ steps.meta.outputs.repo }}/esp8266-platformio:${{ steps.meta.outputs.hash }}
+          echo "Built/pushed: $IMAGE"
+          docker image inspect "$IMAGE" || true
