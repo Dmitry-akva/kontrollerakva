@@ -1,7 +1,7 @@
 name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # ручной запуск
   push:
     paths:
       - 'src/**'
@@ -12,7 +12,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
- 
+      # 1️⃣ Чекаутим только нужные файлы: src и platformio.ini
+      - name: Checkout code only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: project  # временная папка для кода
+          # Загрузим только нужные файлы
+          sparse-checkout: |
+            src/
+            platformio.ini
+
+      # 2️⃣ Логинимся в GHCR (если образ приватный)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -20,13 +31,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 🔍 Безопасный debug (без ${{ }} внутри блока)
-      - name: Debug workspace
-        run: pwd && ls -la
-
+      # 3️⃣ Компиляция прошивки в offline контейнере
       - name: Build firmware inside offline container
-        run: docker run --rm -v "$PWD":/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline pio run -v -j 4
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/project:/workspace" \
+            -w /workspace \
+            ghcr.io/dmitry-akva/esp8266-platformio:offline \
+            pio run -e nodemcuv2 -v -j 4
 
+      # 4️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
