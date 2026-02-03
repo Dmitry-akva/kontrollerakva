@@ -1,5 +1,4 @@
 name: Build Firmware (Offline Docker)
-
 on:
   workflow_dispatch:  # ручной запуск
   push:
