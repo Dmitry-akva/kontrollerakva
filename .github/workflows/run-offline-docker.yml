@@ -23,12 +23,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Проверка содержимого репозитория (опционально, для отладки)
-      - name: Debug: list repository root
-        run: |
-          echo "GITHUB_WORKSPACE = ${{ github.workspace }}"
-          ls -la ${{ github.workspace }}
-
+   
       # 4️⃣ Сборка прошивки в контейнере (всё в одной строке!)
       - name: Build firmware inside Docker
         run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline pio run -v -j 4
