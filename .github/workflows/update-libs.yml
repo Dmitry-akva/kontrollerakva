@@ -31,7 +31,7 @@ jobs:
           git clone --depth 1 https://github.com/GyverLibs/GTimer.git lib/GTimer
           rm -rf lib/GTimer/.git
 
-      # 3️⃣ Коммитим и пушим библиотеки в репозиторий через PAT
+      # 3️⃣ Коммитим и пушим библиотеки через PAT
       - name: Commit and push library updates
         env:
           GH_PAT: ${{ secrets.GH_PAT }}   # Personal Access Token с правами repo
