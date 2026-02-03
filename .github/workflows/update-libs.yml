@@ -1,13 +1,12 @@
-name: Build Offline Docker + Update Libraries
+name: Update Libraries in lib/
 
 on:
-  workflow_dispatch:       # ручной запуск
-  push:
-    paths-ignore:
-      - 'lib/**'          # чтобы пуш обновлений lib не зацикливался
+  workflow_dispatch:   # ручной запуск
+  schedule:
+    - cron: '0 3 * * 0'  # автоматически раз в неделю (воскресенье 03:00 UTC)
 
 jobs:
-  update-libs-and-build:
+  update-libs:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,26 +14,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: true
+          persist-credentials: false   # чтобы пуш через PAT работал
 
-      # 2️⃣ Скачиваем библиотеки в папку lib/ без внутренних .git
-      - name: Download libraries
+      # 2️⃣ Скачиваем библиотеки в папку lib/ (обновляем существующие)
+      - name: Download/update libraries
         run: |
           mkdir -p lib
-          rm -rf lib/FileData lib/GyverPortal lib/GyverHC595 lib/GTimer
-          git clone --depth 1 https://github.com/GyverLibs/FileData.git lib/FileData
+          # FileData
+          if [ -d lib/FileData ]; then
+            git -C lib/FileData pull --depth 1
+          else
+            git clone --depth 1 https://github.com/GyverLibs/FileData.git lib/FileData
+          fi
           rm -rf lib/FileData/.git
-          git clone --depth 1 https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
+
+          # GyverPortal
+          if [ -d lib/GyverPortal ]; then
+            git -C lib/GyverPortal pull --depth 1
+          else
+            git clone --depth 1 https://github.com/GyverLibs/GyverPortal.git lib/GyverPortal
+          fi
           rm -rf lib/GyverPortal/.git
-          git clone --depth 1 https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
+
+          # GyverHC595
+          if [ -d lib/GyverHC595 ]; then
+            git -C lib/GyverHC595 pull --depth 1
+          else
+            git clone --depth 1 https://github.com/GyverLibs/GyverHC595.git lib/GyverHC595
+          fi
           rm -rf lib/GyverHC595/.git
-          git clone --depth 1 https://github.com/GyverLibs/GTimer.git lib/GTimer
+
+          # GTimer
+          if [ -d lib/GTimer ]; then
+            git -C lib/GTimer pull --depth 1
+          else
+            git clone --depth 1 https://github.com/GyverLibs/GTimer.git lib/GTimer
+          fi
           rm -rf lib/GTimer/.git
 
-      # 3️⃣ Коммитим и пушим библиотеки через PAT
+      # 3️⃣ Коммитим и пушим через PAT
       - name: Commit and push library updates
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}   # Personal Access Token с правами repo
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -45,17 +66,3 @@ jobs:
           fi
           git commit -m "Update libraries (FileData, GyverPortal, GyverHC595, GTimer)"
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main
-
-      # 4️⃣ Сборка оффлайн Docker образа с библиотеками внутри
-      - name: Build offline Docker image
-        run: |
-          docker build -t ghcr.io/dmitry-akva/esp8266-platformio:offline .
-
-      # 5️⃣ Публикация образа на GHCR
-      - name: Push Docker image
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-      - run: docker push ghcr.io/dmitry-akva/esp8266-platformio:offline
