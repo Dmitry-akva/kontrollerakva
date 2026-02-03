@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'lib/**'
+      - 'platformio.ini'
       - 'Dockerfile'
 
 jobs:
