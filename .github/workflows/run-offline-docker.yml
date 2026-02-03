@@ -20,15 +20,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 2️⃣ Сборка прошивки в оффлайн Docker контейнере
-      - name: Build firmware
+      # 2️⃣ Сборка прошивки полностью оффлайн внутри контейнера
+      - name: Build firmware inside offline container
         run: |
           docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -v -j 4
 
-      # 3️⃣ Загружаем бинарник прошивки как артефакт
+      # 3️⃣ Загружаем бинарник прошивки как артефакт Actions
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
