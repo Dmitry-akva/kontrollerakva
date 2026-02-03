@@ -11,7 +11,8 @@ RUN pip install --no-cache-dir platformio
 WORKDIR /workspace
 
 # 📂 Копируем проект и библиотеки (lib уже в репозитории)
-
+COPY platformio.ini ./
+COPY src ./src
 COPY lib ./lib
 
 # 💾 Кэшируем PlatformIO (платформы, тулчейны, библиотеки)
