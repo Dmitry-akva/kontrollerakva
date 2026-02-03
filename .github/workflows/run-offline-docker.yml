@@ -1,7 +1,7 @@
 name: Build Firmware (Offline Docker)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # ручной запуск
   push:
     paths:
       - 'src/**'
@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Забираем код репозитория
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      # 0️⃣ Checkout репозитория
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # 2️⃣ Логин в GHCR (если образ приватный)
+      # 1️⃣ Логинимся в GHCR
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -24,28 +24,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Создаём папку для сборочных артефактов снаружи контейнера
-      - name: Prepare build directory
-        run: mkdir -p .pio
+      # 2️⃣ Хэш platformio.ini для тега образа
+      - name: Compute PIO hash
+        id: piohash
+        run: echo "hash=$(sha256sum platformio.ini | cut -d' ' -f1)" >> $GITHUB_OUTPUT
 
-      # 4️⃣ Сборка прошивки
+      # 3️⃣ Проверка существования образа (необязательно, просто чтобы не билдить заново)
+      - name: Pull offline image if exists
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
+          if docker pull $IMAGE; then
+            echo "Image exists: $IMAGE"
+          else
+            echo "Image not found, will build."
+            docker build -t $IMAGE .
+            docker push $IMAGE
+          fi
+
+      # 4️⃣ Сборка прошивки оффлайн
       - name: Build firmware inside offline container
         run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/esp8266-platformio:${{ steps.piohash.outputs.hash }}
+          mkdir -p build_out
           docker run --rm \
             -v ${{ github.workspace }}/src:/workspace/src \
             -v ${{ github.workspace }}/platformio.ini:/workspace/platformio.ini \
-            -v ${{ github.workspace }}/.pio:/workspace/.pio \
+            -v ${{ github.workspace }}/build_out:/out \
             -w /workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline \
-            pio run -v -j 4
+            $IMAGE \
+            bash -lc "\
+              set -euo pipefail; \
+              # Подключаем preloaded libdeps из образа \
+              if [ -d /opt/pio-libdeps ]; then mkdir -p .pio/libdeps && cp -a /opt/pio-libdeps/* .pio/libdeps/ 2>/dev/null || true; fi; \
+              # Подключаем глобальный кеш тулчейнов/платформ \
+              if [ -d /opt/pio-cache/.platformio ]; then mkdir -p /root/.platformio && cp -a /opt/pio-cache/.platformio/* /root/.platformio/ 2>/dev/null || true; fi; \
+              # Собираем прошивку \
+              pio run -v -j 4; \
+              # Копируем бинарники наружу \
+              cp .pio/build/*/*.bin /out/ 2>/dev/null || true; \
+              cp .pio/build/*/*.hex /out/ 2>/dev/null || true; \
+            "
 
-      # 5️⃣ Проверка что бинарник реально появился
-      - name: List build output
-        run: ls -R .pio/build || true
-
-      # 6️⃣ Загрузка прошивки в артефакты
-      - name: Upload firmware binary
+      # 5️⃣ Загружаем бинарник как артефакт Actions
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: .pio/build/*/firmware.bin
+          path: build_out/*
