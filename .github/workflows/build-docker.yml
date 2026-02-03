@@ -1,43 +1,43 @@
-name: Build Offline Docker + ESP8266 Firmware
+name: Build OFFLINE Docker Image (ESP8266)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-offline-docker:
+  build-offline:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v2
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 1️⃣ Собираем Docker-образ PlatformIO
-      - name: Build offline Docker image
-        run: |
-          docker build -t ghcr.io/dmitry-akva/esp8266-platformio-offline:latest -f Dockerfile .
+      # 1️⃣ Собираем базовый образ (без кеша)
+      - name: Build base image
+        run: docker build -t esp8266-base .
 
-      # 2️⃣ Публикуем образ на GHCR
-      - name: Push offline Docker image
+      # 2️⃣ Запускаем контейнер и выполняем первую сборку (создаётся кеш)
+      - name: Warm up PlatformIO cache
         run: |
-          docker push ghcr.io/dmitry-akva/esp8266-platformio-offline:latest
-
-      # 3️⃣ Опционально: сборка прошивки внутри контейнера (проверка)
-      - name: Build firmware (offline check)
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio-offline:latest \
+          docker run --name pio-cache \
+            -v ${{ github.workspace }}:/workspace \
+            esp8266-base \
             pio run -j 4
 
-      # 4️⃣ Загружаем прошивку как артефакт
-      - name: Upload firmware binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: .pio/build/nodemcuv2/firmware.bin
+      # 3️⃣ Сохраняем СОСТОЯНИЕ контейнера как НОВЫЙ образ
+      - name: Commit container as offline image
+        run: |
+          docker commit pio-cache ghcr.io/dmitry-akva/esp8266-platformio:offline
+
+      # 4️⃣ Пушим готовый офлайн образ
+      - name: Push offline image
+        run: docker push ghcr.io/dmitry-akva/esp8266-platformio:offline
+
+      - name: Cleanup
+        run: docker rm pio-cache
