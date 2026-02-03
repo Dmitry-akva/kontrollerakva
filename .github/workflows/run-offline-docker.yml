@@ -1,4 +1,4 @@
-name: Build Firmware (Docker)
+name: Build Firmware (Offline Docker)
 
 on:
   workflow_dispatch:  # ручной запуск
@@ -26,19 +26,13 @@ jobs:
 
       # 3️⃣ Скачиваем готовый Docker образ с библиотеками
       - name: Pull offline Docker image
-        run: |
-          docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline
+        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline
 
-      # 4️⃣ Сборка прошивки в контейнере
+      # 4️⃣ Сборка прошивки в контейнере (всё в одной строке!)
       - name: Build firmware inside Docker
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \  # монтируем проект
-            -w /workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline \
-            pio run -v -j 4
+        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline pio run -v -j 4
 
-      # 5️⃣ Загружаем бинарник прошивки как артефакт Actions
+      # 5️⃣ Загружаем бинарник прошивки как артефакт
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
