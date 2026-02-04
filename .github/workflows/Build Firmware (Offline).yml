@@ -57,7 +57,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            bash -lc "pio run --offline -v -j $JOBS"
+            bash -lc "pio run -v -j $JOBS"
 
       - name: Upload firmware binary(s)
         uses: actions/upload-artifact@v4
