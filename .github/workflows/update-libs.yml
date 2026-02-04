@@ -18,7 +18,7 @@ jobs:
       - name: Set library list
         run: |
           # удобно редактировать список здесь
-          echo "LIBS=https://github.com/FastBot/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
+          echo "LIBS=https://github.com/GyverLibs/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
       - name: Ensure lib/ folder exists
         run: mkdir -p lib
