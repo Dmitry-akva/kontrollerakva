@@ -1,60 +1,64 @@
 name: Update Libraries in lib/
 
 on:
-  workflow_dispatch:   # ручной запуск
+  workflow_dispatch:
   schedule:
-    - cron: '0 3 * * 0'  # автоматически раз в неделю
+    - cron: '0 3 * * 0'  # раз в неделю
 
 jobs:
   update-libs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: false   # чтобы пуш через PAT работал
+          persist-credentials: false
 
+      # 2️⃣ Список библиотек (редактируется тут)
       - name: Set library list
         run: |
-          # удобно редактировать список здесь
-          echo "LIBS=https://github.com/GyverLibs/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
+          echo "LIBS=\
+          https://github.com/GyverLibs/FastBot.git \
+          https://github.com/PaulStoffregen/OneWire.git \
+          https://github.com/milesburton/Arduino-Temperature-Control-Library.git \
+          https://github.com/GyverLibs/FileData.git \
+          https://github.com/GyverLibs/GyverPortal.git \
+          https://github.com/GyverLibs/GyverHC595.git \
+          https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      - name: Ensure lib/ folder exists
-        run: mkdir -p lib
-
-      - name: Clone or update libraries (using GH_PAT)
+      # 3️⃣ Обновляем или клонируем библиотеки
+      - name: Download/update libraries
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
-          echo "Updating libraries using GH_PAT..."
+          mkdir -p lib
+
           for lib in $LIBS; do
             repo_name=$(basename "$lib" .git)
-            repo_path=${lib#https://github.com/}        # e.g. owner/repo.git
-            # build auth URL (works for public and private)
+
+            # Переименование для DallasTemperature
+            if [[ "$repo_name" == "Arduino-Temperature-Control-Library" ]]; then
+              repo_name="DallasTemperature"
+            fi
+
+            repo_path=${lib#https://github.com/}
             auth_url="https://x-access-token:${GH_PAT}@github.com/${repo_path}"
+
             echo ">>> Processing $repo_name"
 
             if [ -d "lib/$repo_name" ]; then
-              if [ -d "lib/$repo_name/.git" ]; then
-                echo " - lib/$repo_name exists with .git -> pulling latest"
-                git -C "lib/$repo_name" pull --rebase || { echo "Pull failed, trying fetch"; git -C "lib/$repo_name" fetch --all --prune; }
-              else
-                echo " - lib/$repo_name exists but has no .git -> removing and recloning"
-                rm -rf "lib/$repo_name"
-                git clone --depth 1 "$auth_url" "lib/$repo_name"
-              fi
-            else
-              echo " - cloning $repo_name"
-              git clone --depth 1 "$auth_url" "lib/$repo_name"
+              echo " - Removing old version"
+              rm -rf "lib/$repo_name"
             fi
+
+            git clone --depth 1 "$auth_url" "lib/$repo_name"
+            rm -rf "lib/$repo_name/.git"
           done
 
-          # Удаляем все .git чтобы сохранить чистые исходники в репо
-          echo "Removing .git folders from lib/..."
-          find lib -type d -name .git -prune -print0 | xargs -0 -r rm -rf || true
-
+      # 4️⃣ Коммит и пуш
       - name: Commit and push library updates
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
