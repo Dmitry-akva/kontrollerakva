@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Log in to GitHub Container Registry
@@ -18,9 +18,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Run build inside container (populate cache)
+      - name: Build project inside container (populate PlatformIO cache)
         run: |
           docker run --name pio_cache_builder \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -v -j 4
 
@@ -32,5 +34,5 @@ jobs:
         run: |
           docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
-      - name: Cleanup container
+      - name: Remove temporary container
         run: docker rm pio_cache_builder || true
