@@ -1,0 +1,36 @@
+name: Refresh Offline Docker Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  refresh-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Run build inside container (populate cache)
+        run: |
+          docker run --name pio_cache_builder \
+            ghcr.io/dmitry-akva/esp8266-platformio:offline \
+            pio run -v -j 4
+
+      - name: Commit updated container to new image
+        run: |
+          docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+      - name: Push updated offline image
+        run: |
+          docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+      - name: Cleanup container
+        run: docker rm pio_cache_builder || true
