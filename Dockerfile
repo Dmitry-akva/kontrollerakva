@@ -1,33 +1,33 @@
+# Базовый образ с Python и необходимыми инструментами
 FROM python:3.11-slim
 
-# Системные зависимости
-RUN apt-get update && apt-get install -y \
-    git build-essential ca-certificates curl \
+# Устанавливаем системные зависимости для PlatformIO и сборки ESP8266
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    unzip \
+    wget \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Устанавливаем PlatformIO
-RUN pip install --no-cache-dir platformio
+RUN python3 -m pip install --upgrade pip setuptools wheel \
+    && pip install platformio
 
-# Папка для предзагрузки
-WORKDIR /opt/pio-preload
+# Создаём папки для кеша и библиотек
+RUN mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace
 
-# Копируем только platformio.ini
-COPY platformio.ini .
-
-# Минимальный src (чтобы pio run сработал)
-RUN mkdir -p src && printf '#include <Arduino.h>\nvoid setup(){}\nvoid loop(){}\n' > src/main.cpp
-
-# Устанавливаем платформы, тулчейны и project lib_deps
-RUN pio pkg install || true
-RUN pio run || true
-
-# Копируем кеши в «фиксированные» папки внутри образа
-RUN mkdir -p /opt/pio-cache && cp -a /root/.platformio /opt/pio-cache/.platformio || true
-RUN mkdir -p /opt/pio-libdeps && cp -a .pio/libdeps /opt/pio-libdeps || true
-
-# Очистка временных файлов для уменьшения размера
-RUN rm -rf /opt/pio-preload/src /opt/pio-preload/.pio/.cache/tmp || true
-
-# Рабочая папка для CI
+# Устанавливаем рабочую директорию
 WORKDIR /workspace
-CMD ["bash"]
+
+# Копируем локальные библиотеки (lib/) в рабочую папку
+# Если хочешь, можно добавить COPY src/ и platformio.ini, но обычно монтируем весь репозиторий при run
+# COPY lib/ /workspace/lib/
+
+# Экспортим кэш PlatformIO (опционально, для документации)
+VOLUME ["/root/.platformio"]
+
+# По умолчанию контейнер просто ждёт команду
+CMD ["tail", "-f", "/dev/null"]
