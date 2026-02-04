@@ -1,4 +1,4 @@
-name: Build Firmware (Offline)
+name: Build Firmware Fully Offline
 
 on:
   workflow_dispatch:
@@ -8,13 +8,15 @@ on:
       - 'platformio.ini'
 
 jobs:
-  build:
+  build-offline:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Логинимся в GHCR (чтобы тянуть offline-образ)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -22,14 +24,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build firmware inside offline container
+      # 3️⃣ Запуск сборки полностью offline
+      - name: Build firmware fully offline
         run: |
           docker run --rm \
+            --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
             pio run -v -j 4
 
+      # 4️⃣ Загружаем бинарник как артефакт
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
