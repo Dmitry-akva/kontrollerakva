@@ -3,42 +3,58 @@ name: Update Libraries in lib/
 on:
   workflow_dispatch:   # ручной запуск
   schedule:
-    - cron: '0 3 * * 0'  # автоматически раз в неделю (воскресенье 03:00 UTC)
+    - cron: '0 3 * * 0'  # автоматически раз в неделю
 
 jobs:
   update-libs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false   # чтобы пуш через PAT работал
 
-      # 2️⃣ Удобный список библиотек
       - name: Set library list
         run: |
+          # удобно редактировать список здесь
           echo "LIBS=https://github.com/FastBot/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      # 3️⃣ Скачиваем или обновляем библиотеки
-      - name: Download/update libraries
+      - name: Ensure lib/ folder exists
+        run: mkdir -p lib
+
+      - name: Clone or update libraries (using GH_PAT)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          mkdir -p lib
+          set -euo pipefail
+          echo "Updating libraries using GH_PAT..."
           for lib in $LIBS; do
             repo_name=$(basename "$lib" .git)
+            repo_path=${lib#https://github.com/}        # e.g. owner/repo.git
+            # build auth URL (works for public and private)
+            auth_url="https://x-access-token:${GH_PAT}@github.com/${repo_path}"
+            echo ">>> Processing $repo_name"
+
             if [ -d "lib/$repo_name" ]; then
-              echo "Updating $repo_name..."
-              git -C "lib/$repo_name" pull --rebase --depth 1 || echo "Failed to update $repo_name, skipping"
+              if [ -d "lib/$repo_name/.git" ]; then
+                echo " - lib/$repo_name exists with .git -> pulling latest"
+                git -C "lib/$repo_name" pull --rebase || { echo "Pull failed, trying fetch"; git -C "lib/$repo_name" fetch --all --prune; }
+              else
+                echo " - lib/$repo_name exists but has no .git -> removing and recloning"
+                rm -rf "lib/$repo_name"
+                git clone --depth 1 "$auth_url" "lib/$repo_name"
+              fi
             else
-              echo "Cloning $repo_name..."
-              git clone --depth 1 "$lib" "lib/$repo_name"
+              echo " - cloning $repo_name"
+              git clone --depth 1 "$auth_url" "lib/$repo_name"
             fi
-            # Убираем папку .git, чтобы хранить чистый исходник
-            rm -rf "lib/$repo_name/.git"
           done
 
-      # 4️⃣ Коммитим и пушим через GH_PAT
+          # Удаляем все .git чтобы сохранить чистые исходники в репо
+          echo "Removing .git folders from lib/..."
+          find lib -type d -name .git -prune -print0 | xargs -0 -r rm -rf || true
+
       - name: Commit and push library updates
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
