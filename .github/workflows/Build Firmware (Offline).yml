@@ -33,6 +33,21 @@ jobs:
           JOBS=$(nproc 2>/dev/null || echo 4)
           echo "jobs=$JOBS" >> $GITHUB_OUTPUT
 
+      # -----------------------------
+      # Диагностика offline-образа
+      # -----------------------------
+      - name: Check installed PlatformIO packages
+        run: |
+          echo "=== PlatformIO Packages in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
+          echo "=== PlatformIO Platforms in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/platforms || true"
+          echo "=== PlatformIO Lib Cache in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
+
+      # -----------------------------
+      # Сборка прошивки полностью offline
+      # -----------------------------
       - name: Build firmware fully offline
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
@@ -42,7 +57,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            pio run -v -j "$JOBS"
+            bash -lc "pio run --offline -v -j $JOBS"
 
       - name: Upload firmware binary(s)
         uses: actions/upload-artifact@v4
