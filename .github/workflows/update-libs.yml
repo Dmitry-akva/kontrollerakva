@@ -2,8 +2,8 @@ name: Update Libraries in lib/
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 0'  # раз в неделю
+#  schedule:
+#    - cron: '0 3 * * 0'  # раз в неделю
 
 jobs:
   update-libs:
