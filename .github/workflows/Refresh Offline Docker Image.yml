@@ -1,18 +1,18 @@
-name: Refresh Offline Docker Image
+name: Build Optimized Offline Docker Image
 
 on:
   workflow_dispatch:
 
 jobs:
-  refresh-image:
+  build-offline-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
-      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Логинимся в GHCR
+      # --- Log in to GHCR ---
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -20,45 +20,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Запускаем контейнер без --rm (чтобы потом сохранить)
-      - name: Start container
+      # --- Build base offline image from Dockerfile ---
+      - name: Build base offline image
+        run: |
+          docker build --pull -t ghcr.io/dmitry-akva/esp8266-platformio:offline-latest .
+
+      # --- Start container with mounted workspace ---
+      - name: Start container for caching
         run: |
           docker run --name pio_cache_builder \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            -d \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline tail -f /dev/null
+            -d ghcr.io/dmitry-akva/esp8266-platformio:offline-latest tail -f /dev/null
 
-      # 4️⃣ Установка всех библиотек Library Manager
-      - name: Install Library Manager dependencies
+      # --- Prepare PlatformIO caches inside container ---
+      - name: Initialize PlatformIO caches
         run: |
-          docker exec pio_cache_builder pio lib install "paulstoffregen/OneWire"
-          docker exec pio_cache_builder pio lib install "milesburton/DallasTemperature"
+          docker exec pio_cache_builder bash -lc "
+            mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
+          "
 
-      # 5️⃣ Установка всех Git-библиотек
-      - name: Install Git libraries
+      # --- Run full offline build to populate caches ---
+      - name: Full offline build to populate cache
         run: |
-          docker exec pio_cache_builder pio lib install "https://github.com/GyverLibs/FileData.git"
-          docker exec pio_cache_builder pio lib install "https://github.com/GyverLibs/GyverPortal.git"
-          docker exec pio_cache_builder pio lib install "https://github.com/GyverLibs/GyverHC595.git"
-          docker exec pio_cache_builder pio lib install "https://github.com/GyverLibs/GTimer.git"
+          docker exec pio_cache_builder bash -lc "
+            echo 'Running test build with all libraries from lib/ folder...'
+            pio run -v -j 4 --network none
+          "
 
-      # 6️⃣ Сборка прошивки внутри контейнера (для кэширования всех toolchains)
-      - name: Build project (populate PlatformIO cache)
-        run: docker exec pio_cache_builder pio run -v -j 4
-
-      # 7️⃣ Проверка кэша (опционально)
-      - name: Show PlatformIO cache size
-        run: docker exec pio_cache_builder du -sh /root/.platformio || true
-
-      # 8️⃣ Коммит контейнера в новый образ
-      - name: Commit updated container to new image
+      # --- Commit container with fully cached PlatformIO ---
+      - name: Commit container as new offline image
         run: docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
-      # 9️⃣ Пушим образ в GHCR
-      - name: Push updated offline image
+      # --- Push new offline image to GHCR ---
+      - name: Push offline image to GHCR
         run: docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
-      # 🔟 Чистим временный контейнер
+      # --- Cleanup temporary container ---
       - name: Remove temporary container
         run: docker rm -f pio_cache_builder || true
