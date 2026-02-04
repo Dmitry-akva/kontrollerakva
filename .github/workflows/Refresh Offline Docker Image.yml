@@ -18,6 +18,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      # 👉 Запускаем контейнер БЕЗ --rm, чтобы потом его сохранить
       - name: Build project inside container (populate PlatformIO cache)
         run: |
           docker run --name pio_cache_builder \
@@ -26,13 +27,20 @@ jobs:
             ghcr.io/dmitry-akva/esp8266-platformio:offline \
             pio run -v -j 4
 
+      # (необязательно, но полезно увидеть размер кэша)
+      - name: Show PlatformIO cache size
+        run: docker exec pio_cache_builder du -sh /root/.platformio || true
+
+      # 👉 Сохраняем состояние контейнера как НОВЫЙ образ
       - name: Commit updated container to new image
         run: |
           docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
+      # 👉 Пушим его в реестр
       - name: Push updated offline image
         run: |
           docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
+      # 👉 Чистим временный контейнер
       - name: Remove temporary container
         run: docker rm pio_cache_builder || true
