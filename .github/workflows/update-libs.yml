@@ -1,44 +1,54 @@
-name: Download / Update Libraries to repo
+name: Update Libraries in lib/
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # ручной запуск
+  schedule:
+    - cron: '0 3 * * 0'  # автоматически раз в неделю (воскресенье 03:00 UTC)
 
 jobs:
-  fetch-libs:
+  update-libs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Клонируем репозиторий
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false   # чтобы пуш через PAT работал
 
-      # --- Удобный список библиотек ---
-      - name: Set list of libraries
+      # 2️⃣ Удобный список библиотек
+      - name: Set library list
         run: |
           echo "LIBS=https://github.com/FastBot/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      # --- Создаём lib/ если нет ---
-      - name: Ensure lib/ folder exists
-        run: mkdir -p lib
-
-      # --- Клонируем или обновляем библиотеки ---
-      - name: Clone or update libraries
+      # 3️⃣ Скачиваем или обновляем библиотеки
+      - name: Download/update libraries
         run: |
+          mkdir -p lib
           for lib in $LIBS; do
             repo_name=$(basename "$lib" .git)
             if [ -d "lib/$repo_name" ]; then
-              echo "Library $repo_name exists, pulling latest..."
-              git -C "lib/$repo_name" pull --rebase || echo "Failed to update $repo_name, skipping"
+              echo "Updating $repo_name..."
+              git -C "lib/$repo_name" pull --rebase --depth 1 || echo "Failed to update $repo_name, skipping"
             else
               echo "Cloning $repo_name..."
               git clone --depth 1 "$lib" "lib/$repo_name"
             fi
+            # Убираем папку .git, чтобы хранить чистый исходник
+            rm -rf "lib/$repo_name/.git"
           done
 
-      # --- Commit & push changes ---
-      - name: Commit & push libraries
+      # 4️⃣ Коммитим и пушим через GH_PAT
+      - name: Commit and push library updates
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add lib/
-          git commit -m "Update libraries via workflow" || echo "No changes to commit"
-          git push
+          git add lib
+          if git diff --cached --quiet; then
+            echo "No library updates"
+            exit 0
+          fi
+          git commit -m "Update libraries via workflow"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main
