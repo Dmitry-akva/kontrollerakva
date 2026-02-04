@@ -1,57 +1,45 @@
-name: Install Libraries in Offline Docker Image
+name: Download Libraries to repo
 
 on:
-  workflow_dispatch:  # ручной запуск через кнопку
+  workflow_dispatch:
 
 jobs:
-  install-libs:
+  fetch-libs:
     runs-on: ubuntu-latest
-    env:
-      IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Pull offline Docker image
-        run: docker pull $IMAGE || true
-
-      # --- Удобный список библиотек в одной строке ---
+      # --- Удобный список библиотек ---
       - name: Set list of libraries
         run: |
           echo "LIBS=FastBot paulstoffregen/OneWire milesburton/DallasTemperature https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      # --- Запускаем контейнер для установки библиотек ---
-      - name: Start container for caching
-        run: |
-          docker run --name pio_cache_builder \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            -d $IMAGE tail -f /dev/null
+      # --- Создаём папку lib, если её нет ---
+      - name: Ensure lib/ folder exists
+        run: mkdir -p lib
 
-      # --- Устанавливаем библиотеки ---
-      - name: Install libraries inside container
+      # --- Скачиваем библиотеки в lib/ ---
+      - name: Download libraries
         run: |
           for lib in $LIBS; do
-            echo "Installing $lib..."
-            docker exec pio_cache_builder bash -lc "pio lib install \"$lib\""
+            echo "Fetching $lib..."
+            # Если это ссылка на git
+            if [[ "$lib" =~ ^https:// ]]; then
+              repo_name=$(basename "$lib" .git)
+              git clone --depth 1 "$lib" "lib/$repo_name" || true
+            else
+              # Пакеты PlatformIO через CLI
+              pio lib install "$lib" -d lib || true
+            fi
           done
 
-      # --- Commit container as new offline image ---
-      - name: Commit container as new offline image
-        run: docker commit pio_cache_builder $IMAGE
-
-      # --- Push updated image to GHCR ---
-      - name: Push updated image
-        run: docker push $IMAGE
-
-      # --- Cleanup temporary container ---
-      - name: Remove temporary container
-        run: docker rm -f pio_cache_builder || true
+      # --- Commit & push downloaded libraries ---
+      - name: Commit downloaded libraries
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add lib/
+          git commit -m "Update libraries via workflow" || echo "No changes to commit"
+          git push
