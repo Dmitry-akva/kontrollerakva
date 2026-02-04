@@ -1,4 +1,4 @@
-name: Update Libraries in lib/
+name: Download / Update Libraries to repo
 
 on:
   workflow_dispatch:
@@ -11,23 +11,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Удобный список библиотек (только git) ---
-      - name: Set list of Git libraries
+      # --- Удобный список библиотек ---
+      - name: Set list of libraries
         run: |
           echo "LIBS=https://github.com/FastBot/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      # --- Создаём папку lib/ если не существует ---
+      # --- Создаём lib/ если нет ---
       - name: Ensure lib/ folder exists
         run: mkdir -p lib
 
-      # --- Скачиваем git-репозитории библиотек ---
-      - name: Clone/update libraries
+      # --- Клонируем или обновляем библиотеки ---
+      - name: Clone or update libraries
         run: |
           for lib in $LIBS; do
             repo_name=$(basename "$lib" .git)
             if [ -d "lib/$repo_name" ]; then
-              echo "Library $repo_name already exists, pulling latest..."
-              git -C "lib/$repo_name" pull || echo "Failed to pull $repo_name, skipping"
+              echo "Library $repo_name exists, pulling latest..."
+              git -C "lib/$repo_name" pull --rebase || echo "Failed to update $repo_name, skipping"
             else
               echo "Cloning $repo_name..."
               git clone --depth 1 "$lib" "lib/$repo_name"
@@ -35,7 +35,7 @@ jobs:
           done
 
       # --- Commit & push changes ---
-      - name: Commit updated libraries
+      - name: Commit & push libraries
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
