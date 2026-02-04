@@ -1,7 +1,7 @@
 name: Install Libraries in Offline Docker Image
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # ручной запуск через кнопку
 
 jobs:
   install-libs:
@@ -23,17 +23,10 @@ jobs:
       - name: Pull offline Docker image
         run: docker pull $IMAGE || true
 
-      # --- Удобный список библиотек ---
+      # --- Удобный список библиотек в одной строке ---
       - name: Set list of libraries
         run: |
-          echo "LIBS=\
-FastBot \
-paulstoffregen/OneWire \
-milesburton/DallasTemperature \
-https://github.com/GyverLibs/FileData.git \
-https://github.com/GyverLibs/GyverPortal.git \
-https://github.com/GyverLibs/GyverHC595.git \
-https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
+          echo "LIBS=FastBot paulstoffregen/OneWire milesburton/DallasTemperature https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
       # --- Запускаем контейнер для установки библиотек ---
       - name: Start container for caching
