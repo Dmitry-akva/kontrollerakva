@@ -5,7 +5,6 @@ on:
   push:
     paths:
       - 'src/**'
-      - 'lib/**'
       - 'platformio.ini'
 
 jobs:
