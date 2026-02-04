@@ -2,10 +2,6 @@ name: Build Firmware (Offline Docker)
 
 on:
   workflow_dispatch:  # ручной запуск
-  push:
-    paths:
-      - 'src/**'
-      - 'platformio.ini'
 
 env:
   IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:latest  # тег образа
