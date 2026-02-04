@@ -1,11 +1,15 @@
-name: Build Firmware Fully Offline
+name: Build Firmware Fully Offline (Fast)
 
 on:
   workflow_dispatch:
   push:
     paths:
       - 'src/**'
+      - 'lib/**'
       - 'platformio.ini'
+
+env:
+  NUM_CORES: 4  # число потоков сборки
 
 jobs:
   build-offline:
@@ -16,7 +20,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Логинимся в GHCR (чтобы тянуть offline-образ)
+      # 2️⃣ Кэш PlatformIO библиотек и toolchains
+      - name: Cache PlatformIO
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.platformio/lib
+            ~/.platformio/packages
+          key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini') }}
+
+      # 3️⃣ Кэш сборки (.pio/build)
+      - name: Cache PlatformIO build output
+        uses: actions/cache@v3
+        with:
+          path: .pio/build
+          key: ${{ runner.os }}-pio-build-${{ github.sha }}
+
+      # 4️⃣ Логинимся в GHCR (чтобы тянуть offline-образ)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -24,7 +44,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Запуск сборки полностью offline
+      # 5️⃣ Скачиваем/используем offline Docker-образ
+      - name: Pull offline Docker image
+        run: docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+      # 6️⃣ Полностью offline сборка прошивки
       - name: Build firmware fully offline
         run: |
           docker run --rm \
@@ -32,9 +56,9 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
-            pio run -v -j 4
+            pio run -v -j $NUM_CORES
 
-      # 4️⃣ Загружаем бинарник как артефакт
+      # 7️⃣ Загружаем бинарник как артефакт
       - name: Upload firmware binary
         uses: actions/upload-artifact@v4
         with:
