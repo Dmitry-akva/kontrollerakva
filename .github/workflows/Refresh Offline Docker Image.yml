@@ -45,7 +45,7 @@ jobs:
         run: |
           docker exec pio_cache_builder bash -lc "
             echo 'Running test build with all libraries from lib/ folder...'
-            pio run -v -j 4 --network none
+            pio run -v -j 4
           "
 
       # --- Commit container with fully cached PlatformIO ---
