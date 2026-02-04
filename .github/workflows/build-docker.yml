@@ -2,10 +2,7 @@ name: Build Offline Docker Image
 
 on:
   workflow_dispatch:   # ручной запуск
-  push:
-    paths:
-      - 'platformio.ini'
-      - 'Dockerfile'
+
 
 jobs:
   build-image:
