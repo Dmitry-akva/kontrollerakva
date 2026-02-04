@@ -1,4 +1,4 @@
-name: Download Libraries to repo
+name: Update Libraries in lib/
 
 on:
   workflow_dispatch:
@@ -11,32 +11,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Удобный список библиотек ---
-      - name: Set list of libraries
+      # --- Удобный список библиотек (только git) ---
+      - name: Set list of Git libraries
         run: |
-          echo "LIBS=FastBot paulstoffregen/OneWire milesburton/DallasTemperature https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
+          echo "LIBS=https://github.com/FastBot/FastBot.git https://github.com/paulstoffregen/OneWire.git https://github.com/milesburton/DallasTemperature.git https://github.com/GyverLibs/FileData.git https://github.com/GyverLibs/GyverPortal.git https://github.com/GyverLibs/GyverHC595.git https://github.com/GyverLibs/GTimer.git" >> $GITHUB_ENV
 
-      # --- Создаём папку lib, если её нет ---
+      # --- Создаём папку lib/ если не существует ---
       - name: Ensure lib/ folder exists
         run: mkdir -p lib
 
-      # --- Скачиваем библиотеки в lib/ ---
-      - name: Download libraries
+      # --- Скачиваем git-репозитории библиотек ---
+      - name: Clone/update libraries
         run: |
           for lib in $LIBS; do
-            echo "Fetching $lib..."
-            # Если это ссылка на git
-            if [[ "$lib" =~ ^https:// ]]; then
-              repo_name=$(basename "$lib" .git)
-              git clone --depth 1 "$lib" "lib/$repo_name" || true
+            repo_name=$(basename "$lib" .git)
+            if [ -d "lib/$repo_name" ]; then
+              echo "Library $repo_name already exists, pulling latest..."
+              git -C "lib/$repo_name" pull || echo "Failed to pull $repo_name, skipping"
             else
-              # Пакеты PlatformIO через CLI
-              pio lib install "$lib" -d lib || true
+              echo "Cloning $repo_name..."
+              git clone --depth 1 "$lib" "lib/$repo_name"
             fi
           done
 
-      # --- Commit & push downloaded libraries ---
-      - name: Commit downloaded libraries
+      # --- Commit & push changes ---
+      - name: Commit updated libraries
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
