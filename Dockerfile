@@ -1,26 +1,42 @@
-# Используем лёгкий Python-образ
+# -------- База --------
 FROM python:3.11-slim
 
-# Устанавливаем необходимые системные пакеты
+ENV DEBIAN_FRONTEND=noninteractive \
+    PLATFORMIO_CORE_DIR=/root/.platformio \
+    PATH="/root/.local/bin:${PATH}"
+
+# -------- Системные зависимости (минимум) --------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl unzip build-essential libffi-dev libssl-dev \
+    git \
+    ca-certificates \
+    curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем PlatformIO
-RUN python3 -m pip install --upgrade pip setuptools wheel \
-    && pip install platformio
+# -------- Установка PlatformIO без кеша pip --------
+RUN pip install --no-cache-dir platformio
 
-# Предустанавливаем платформу ESP8266 (Arduino + toolchain)
-RUN pio platform install espressif8266
+# -------- Предустановка платформы и тулчейна ESP8266 --------
+RUN pio pkg install --global \
+    --platform espressif8266 \
+    --tool toolchain-xtensa \
+    --tool tool-esptool \
+    --tool tool-mkspiffs
 
-# Создаём папки для кеша и библиотек
-RUN mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace
+# -------- Создаём рабочие папки --------
+RUN mkdir -p /workspace /root/.platformio/lib
 
-# Устанавливаем рабочую директорию
 WORKDIR /workspace
 
-# Копируем локальные библиотеки lib/ в рабочую директорию
+# -------- Копируем локальные библиотеки --------
 COPY lib/ /workspace/lib/
 
-# Контейнер просто ждёт команды
+# -------- Тестовая "пустая" ини чтобы PIO проиндексировал lib --------
+RUN echo "[env:nodemcuv2]\nplatform=espressif8266\nboard=nodemcuv2\nframework=arduino" > platformio.ini \
+ && mkdir src \
+ && echo "void setup(){} void loop(){}" > src/main.cpp \
+ && pio run -e nodemcuv2 || true \
+ && rm -rf src platformio.ini .pio
+
+# -------- Контейнер ждёт команд --------
 CMD ["tail", "-f", "/dev/null"]
