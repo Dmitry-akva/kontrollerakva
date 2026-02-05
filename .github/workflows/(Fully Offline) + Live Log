@@ -1,23 +1,26 @@
-name: Build Firmware (Fully Offline) + Live Log
+name: Build Firmware and Publish Log
 
 on:
   workflow_dispatch:
   push:
     paths:
       - 'src/**'
+ 
 
 jobs:
-  build-offline:
+  build-and-publish:
     runs-on: ubuntu-latest
     env:
       IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
     steps:
+      # 1️⃣ Клонируем main, чтобы работать с кодом
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
+      # 2️⃣ Авторизация в GHCR
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -25,101 +28,47 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Pull offline Docker image (if not present)
+      # 3️⃣ Pull образа (если есть)
+      - name: Pull offline Docker image
         run: docker pull $IMAGE || true
 
+      # 4️⃣ Определяем число параллельных задач
       - name: Determine number of build jobs
         id: set_jobs
         run: |
           JOBS=$(nproc 2>/dev/null || echo 4)
           echo "jobs=$JOBS" >> $GITHUB_OUTPUT
 
-      # -----------------------------
-      # Диагностика offline-образа
-      # -----------------------------
-      - name: Check installed PlatformIO packages
-        run: |
-          echo "=== PlatformIO Packages in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
-          echo "=== PlatformIO Platforms in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/platforms || true"
-          echo "=== PlatformIO Lib Cache in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
-
-      # -----------------------------
-      # Сборка прошивки полностью offline
-      # -----------------------------
-      - name: Build firmware fully offline
+      # 5️⃣ Сборка прошивки полностью offline + лог в html
+      - name: Build firmware and generate HTML log
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
-          # Перезаписываем лог и показываем на stdout
+
+          # Сборка и генерация HTML лога
           docker run --rm \
             --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt || true
+            bash -lc "pio run -v -j $JOBS" 2>&1 \
+            | sed 's/$/<br>/' > build-log.html
 
-      - name: Upload firmware binary(s)
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: .pio/build/**/firmware*.bin
-
-      - name: Generate live HTML log
-        if: always()
-        run: |
-          cat > build-log.html <<'HTML'
-          <!DOCTYPE html>
-          <html>
-          <head>
-          <meta charset="UTF-8">
-          <title>Live Build Log</title>
-          <style>
-          body { font-family: monospace; white-space: pre; background: #111; color: #eee; padding: 10px; }
-          #log { max-width: 100%; word-break: break-all; }
-          </style>
-          <script>
-          function scrollToBottom() { window.scrollTo(0, document.body.scrollHeight); }
-          async function refresh() {
-            try {
-              const r = await fetch('build-log.txt', {cache: 'no-store'});
-              const t = await r.text();
-              const el = document.getElementById('log');
-              el.textContent = t;
-              scrollToBottom();
-            } catch(e) {}
-          }
-          setInterval(refresh, 5000);
-          window.addEventListener('load', refresh);
-          </script>
-          </head>
-          <body>
-          <pre id="log">Waiting for log...</pre>
-          </body>
-          </html>
-          HTML
-
-      - name: Push live logs to gh-pages
-        if: always()
+      # 6️⃣ Публикация build-log.html в gh-pages
+      - name: Publish build log to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          set -euo pipefail
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
 
-          # Создаём orphan-ветку, коммитим только лог
-          git checkout --orphan temp-gh-pages || true
-          git rm -rf . >/dev/null 2>&1 || true
+          # Клонируем gh-pages ветку
+          git clone --single-branch --branch gh-pages https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
+          cd gh-pages
 
-          cp build-log.txt build-log.html .
+          # Копируем новый лог
+          cp ../build-log.html ./build-log.html
 
-          git add build-log.txt build-log.html
-          git commit -m "Update live build log" || echo "No changes to commit"
-
-          git push --force https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:gh-pages
-
-          git checkout -f - || true
-          git branch -D temp-gh-pages || true
+          git add build-log.html
+          git commit -m "Update build log [ci skip]" || echo "No changes"
+          git push origin gh-pages
