@@ -1,36 +1,37 @@
-      - name: Prepare GitHub Pages content
-        run: |
-          mkdir public
-          cp build-log.txt public/
+name: Init GitHub Pages Branch
 
-          cat > public/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="UTF-8">
-            <meta http-equiv="refresh" content="10">
-            <title>Build Log</title>
-            <style>
-              body { background:#111; color:#0f0; font-family: monospace; white-space: pre-wrap; }
-            </style>
-          </head>
-          <body>
-          <h2>ESP8266 Build Log (auto обновление каждые 10 сек)</h2>
-          <div id="log">Loading...</div>
-          <script>
-            async function loadLog() {
-              const res = await fetch('build-log.txt?' + Date.now());
-              document.getElementById('log').textContent = await res.text();
-            }
-            loadLog();
-            setInterval(loadLog, 10000);
-          </script>
-          </body>
-          </html>
-          EOF
+on:
+  workflow_dispatch:
 
-      - name: Deploy to gh-pages branch
-        uses: peaceiris/actions-gh-pages@v4
+jobs:
+  create-gh-pages:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
+          persist-credentials: false
+
+      - name: Create gh-pages branch
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          # Клонируем репозиторий заново для чистой работы с ветками
+          git clone https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} repo
+          cd repo
+
+          # Если ветки нет — создаём
+          if ! git ls-remote --exit-code --heads origin gh-pages; then
+            git checkout --orphan gh-pages
+            git rm -rf . || true
+            echo "GitHub Pages branch initialized" > index.html
+            git add index.html
+            git commit -m "Initialize gh-pages branch"
+            git push origin gh-pages
+          else
+            echo "gh-pages branch already exists, nothing to do"
+          fi
