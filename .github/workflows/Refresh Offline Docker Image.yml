@@ -24,7 +24,6 @@ jobs:
       - name: Build base offline image
         run: |
           docker build --pull -t ghcr.io/dmitry-akva/esp8266-platformio:offline-latest .
-
       # --- Start container with mounted workspace ---
       - name: Start container for caching
         run: |
@@ -32,14 +31,12 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             -d ghcr.io/dmitry-akva/esp8266-platformio:offline-latest tail -f /dev/null
-
       # --- Prepare PlatformIO caches inside container ---
       - name: Initialize PlatformIO caches
         run: |
           docker exec pio_cache_builder bash -lc "
             mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
           "
-
       # --- Run full offline build to populate caches ---
       - name: Full offline build to populate cache
         run: |
@@ -47,7 +44,6 @@ jobs:
             echo 'Running test build with all libraries from lib/ folder...'
             pio run -v -j 4
           "
-
       # --- Commit container with fully cached PlatformIO ---
       - name: Commit container as new offline image
         run: docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
