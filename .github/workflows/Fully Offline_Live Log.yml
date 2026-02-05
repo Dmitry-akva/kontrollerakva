@@ -1,4 +1,4 @@
-name: Build Firmware (Fully Offline)
+name: Build Firmware (Fully Offline+log) 
 
 on:
   workflow_dispatch:
