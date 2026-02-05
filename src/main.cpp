@@ -15,8 +15,7 @@ void setup() {
     // Инициализация последовательного порта
     Serial.begin(115200);
     Serial.println("ESP8266 minimal build test");
-    Serial.println("ESP8266 minimal build test");
-    Serial.println("ESP8266 minimal build test");
+
 }
 
 void loop() {
