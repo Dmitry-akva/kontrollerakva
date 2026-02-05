@@ -1,0 +1,142 @@
+name: Build Firmware (Fully Offline) + Live Log
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+
+jobs:
+  build-offline:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # важно для пуша через GH_PAT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Pull offline Docker image (if not present)
+        run: docker pull $IMAGE || true
+
+      - name: Determine number of build jobs
+        id: set_jobs
+        run: |
+          JOBS=$(nproc 2>/dev/null || echo 4)
+          echo "jobs=$JOBS" >> $GITHUB_OUTPUT
+
+      # Диагностика образа (опционально)
+      - name: Check installed PlatformIO packages
+        run: |
+          echo "=== PlatformIO Packages in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
+          echo "=== PlatformIO Platforms in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/platforms || true"
+          echo "=== PlatformIO Lib Cache in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
+
+      # Сборка прошивки: лог в файл (stdout+stderr), не падаем на ошибке
+      - name: Build firmware & save raw log
+        run: |
+          JOBS=${{ steps.set_jobs.outputs.jobs }}
+          echo "Running PlatformIO fully offline with -j $JOBS"
+          # собираем, перенаправляем stderr в stdout, tee пишет в файл на хосте
+          docker run --rm \
+            --network none \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            $IMAGE \
+            bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt || true
+
+      # (опционально) загрузить бинарники как артефакт
+      - name: Upload firmware binary(s)
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/**/firmware*.bin
+
+      # Коммитим build-log.txt в main (перезаписывается)
+      - name: Commit build log to main
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add build-log.txt || true
+          git commit -m "Update build log" || echo "No changes to commit"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main || echo "Push to main failed"
+
+      # Генерируем live HTML (автообновление каждые 5s и автоскролл)
+      - name: Generate live HTML log
+        run: |
+          cat > build-log.html <<'HTML'
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Live Build Log</title>
+<style>
+body { font-family: monospace; white-space: pre; background: #111; color: #eee; padding: 10px; }
+#log { max-width: 100%; word-break: break-all; }
+</style>
+<script>
+function scrollToBottom() { window.scrollTo(0, document.body.scrollHeight); }
+async function refresh() {
+  try {
+    const r = await fetch('build-log.txt', {cache: 'no-store'});
+    const t = await r.text();
+    const el = document.getElementById('log');
+    el.textContent = t;
+    scrollToBottom();
+  } catch(e) {
+    // ignore
+  }
+}
+setInterval(refresh, 5000);
+window.addEventListener('load', refresh);
+</script>
+</head>
+<body>
+<pre id="log">Waiting for log...</pre>
+</body>
+</html>
+HTML
+
+      # Пушим HTML + raw txt в gh-pages (force update)
+      - name: Push live logs to gh-pages
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Текущая ветка (обычно main)
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD || echo "main")
+
+          # Создаём временную orphan-ветку, коммитим только нужные файлы и форс-пушим в gh-pages
+          git checkout --orphan temp-gh-pages || true
+          git rm -rf . >/dev/null 2>&1 || true
+
+          cp build-log.txt build-log.html .
+
+          git add build-log.txt build-log.html
+          git commit -m "Update live build log" || echo "No changes to commit"
+
+          # Форс-пушим в ветку gh-pages
+          git push --force https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:gh-pages
+
+          # Вернёмся на исходную ветку и удалим временную локальную ветку
+          git checkout -f ${CURRENT_BRANCH} || true
+          git branch -D temp-gh-pages || true
