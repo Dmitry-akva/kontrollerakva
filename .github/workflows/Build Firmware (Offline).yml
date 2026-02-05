@@ -68,3 +68,13 @@ jobs:
         with:
           name: firmware
           path: .pio/build/**/firmware*.bin
+
+      - name: Commit build log
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add build-log.txt
+          git commit -m "Update build log" || echo "No changes in build-log.txt"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main
