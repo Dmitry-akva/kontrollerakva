@@ -1,4 +1,53 @@
-Processing nodemcuv2 (platform: espressif8266; board: nodemcuv2; framework: arduino; monitor_speed: 115200; build_flags: -D LED_BUILTIN=2)<br>
---------------------------------------------------------------------------------<br>
-Library Manager: Installing paulstoffregen/OneWire @ ^2.3.5<br>
-HTTPClientError: <br>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Live Build Log</title>
+<style>
+body { margin:0; background:#0b0b0f; color:#e6e6e6; font-family: Menlo, Monaco, monospace; }
+header { padding:10px; background:#071129; color:#9fd3ff; font-weight:700; }
+#meta { font-size:0.9em; color:#99b; }
+#log { padding:12px; white-space:pre-wrap; font-size:13px; line-height:1.25; max-height: calc(100vh - 74px); overflow:auto; }
+.err { color:#ff6b6b; font-weight:700; }
+.warn { color:#ffd36b; }
+.time { color:#8ac6ff; font-size:0.9em; }
+footer { padding:8px 12px; font-size:0.9em; color:#8aa; background:#071129; }
+</style>
+<script>
+const REFRESH_MS = 3000;
+async function fetchLog() {
+  try {
+    const r = await fetch('build-log.txt?_=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    renderLog(text);
+  } catch (e) {
+    renderLog('Could not fetch log: ' + e.message + '\n', true);
+  }
+}
+let lastText = '';
+function renderLog(text, force=false) {
+  if(text===lastText && !force) return;
+  lastText=text;
+  const el=document.getElementById('log');
+  const html=text.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .split('\n').map(line=>{
+      if(/\b(error|failed|fatal)\b/i.test(line)) return '<div class="err">'+line+'</div>';
+      if(/\b(warning|warn)\b/i.test(line)) return '<div class="warn">'+line+'</div>';
+      return '<div>'+line+'</div>';
+    }).join('');
+  el.innerHTML=html;
+  const nearBottom=(el.scrollHeight-el.scrollTop-el.clientHeight)<200;
+  if(nearBottom) el.scrollTop=el.scrollHeight;
+  document.getElementById('meta').textContent='Updated: '+new Date().toLocaleString();
+}
+window.addEventListener('load',()=>{fetchLog(); setInterval(fetchLog, REFRESH_MS);});
+</script>
+</head>
+<body>
+<header>Live build log — <span id="meta" class="time">loading…</span></header>
+<main id="log">Loading log…</main>
+<footer>Auto-refresh every 3s — no F5 required</footer>
+</body>
+</html>
