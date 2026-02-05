@@ -52,13 +52,13 @@ jobs:
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
-          # Перезаписываем build-log.txt каждый раз, stderr тоже в лог
+          # Выводим лог прямо в рабочую папку на GitHub runner
           docker run --rm \
             --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            bash -lc "pio run -v -j $JOBS > build-log.txt 2>&1 || true"
+            bash -lc "pio run -v -j $JOBS" | tee build-log.txt
 
 
 
