@@ -1,0 +1,36 @@
+      - name: Prepare GitHub Pages content
+        run: |
+          mkdir public
+          cp build-log.txt public/
+
+          cat > public/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta http-equiv="refresh" content="10">
+            <title>Build Log</title>
+            <style>
+              body { background:#111; color:#0f0; font-family: monospace; white-space: pre-wrap; }
+            </style>
+          </head>
+          <body>
+          <h2>ESP8266 Build Log (auto обновление каждые 10 сек)</h2>
+          <div id="log">Loading...</div>
+          <script>
+            async function loadLog() {
+              const res = await fetch('build-log.txt?' + Date.now());
+              document.getElementById('log').textContent = await res.text();
+            }
+            loadLog();
+            setInterval(loadLog, 10000);
+          </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
