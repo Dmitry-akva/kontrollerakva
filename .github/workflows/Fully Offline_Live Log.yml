@@ -1,4 +1,4 @@
-name: Build Firmware & Update Log
+name: Build Firmware (Fully Offline)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          persist-credentials: false  # важно! чтобы push шёл через GH_PAT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -25,15 +25,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
+      - name: Pull offline Docker image (if not present)
+        run: docker pull $IMAGE || true
+
       - name: Determine number of build jobs
         id: set_jobs
         run: |
           JOBS=$(nproc 2>/dev/null || echo 4)
           echo "jobs=$JOBS" >> $GITHUB_OUTPUT
 
+      # -----------------------------
+      # Диагностика offline-образа
+      # -----------------------------
+      - name: Check installed PlatformIO packages
+        run: |
+          echo "=== PlatformIO Packages in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
+          echo "=== PlatformIO Platforms in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/platforms || true"
+          echo "=== PlatformIO Lib Cache in Image ==="
+          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
+
+      # -----------------------------
+      # Сборка прошивки полностью offline
+      # -----------------------------
       - name: Build firmware fully offline
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
+          echo "Running PlatformIO fully offline with -j $JOBS"
           docker run --rm \
             --network none \
             -v ${{ github.workspace }}:/workspace \
@@ -41,15 +60,18 @@ jobs:
             $IMAGE \
             bash -lc "pio run -v -j $JOBS" | tee build-log.txt
 
-      - name: Push build log to gh-pages
+      - name: Upload firmware binary(s)
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/**/firmware*.bin
+
+      - name: Commit build log
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git fetch origin gh-pages || git checkout --orphan gh-pages
-          git checkout gh-pages || git checkout --orphan gh-pages
-          git reset --soft
           git add build-log.txt
-          git commit -m "Update live build log [ci skip]" || echo "No changes"
-          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages:gh-pages
+          git commit -m "Update build log" || echo "No changes"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:gh-pages
