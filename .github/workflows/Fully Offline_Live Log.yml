@@ -56,22 +56,14 @@ jobs:
           name: firmware
           path: .pio/build/**/firmware*.bin
 
-      - name: Push build log to gh-pages
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+      - name: Build firmware fully offline
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-
-          # Клонируем ТОЛЬКО ветку gh-pages в отдельную папку
-          git clone --depth 1 --branch gh-pages https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages-dir || \
-          git clone --depth 1 https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages-dir
-
-          cd gh-pages-dir
-
-          # Копируем свежий лог
-          cp ../build-log.txt ./build-log.txt
-
-          git add build-log.txt
-          git commit -m "Update build log [ci skip]" || echo "No changes"
-          git push
+          JOBS=${{ steps.set_jobs.outputs.jobs }}
+          echo "Running PlatformIO fully offline with -j $JOBS"
+      
+          docker run --rm \
+            --network none \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            $IMAGE \
+            bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt
