@@ -21,7 +21,18 @@ jobs:
       - name: 🔽 Pull offline PlatformIO image
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          echo "Pulling offline image: $IMAGE"
           docker pull $IMAGE
+
+      - name: 🔍 Verify essential libraries in image
+        run: |
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          docker run --rm $IMAGE bash -c "\
+            test -d /platformio/packages/FastBot || (echo 'FastBot missing'; exit 1); \
+            test -d /platformio/packages/OneWire || (echo 'OneWire missing'; exit 1); \
+            test -d /platformio/packages/DallasTemperature || (echo 'DallasTemperature missing'; exit 1); \
+            echo 'All essential libraries found' \
+          "
 
       - name: 🛠 Build firmware inside offline container
         run: |
