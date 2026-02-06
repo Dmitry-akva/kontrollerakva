@@ -1,10 +1,10 @@
-name: Build Firmware Offline
+name: Build Firmware Offline (Final)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-offline-firmware:
+  build-offline-final:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,28 +15,21 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------
-      # 2. Build final Docker image (Python + PlatformIO)
+      # 2. Pull offline image с прогретым кешем
       # -----------------------------
-      - name: Build Docker image
+      - name: Pull offline Docker image
         run: |
-          docker build -t esp-final:latest -f Dockerfile.final .
+          docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline-final
 
       # -----------------------------
-      # 3. Create container, copy project, compile firmware
+      # 3. Build firmware внутри контейнера
       # -----------------------------
-      - name: Compile firmware inside container
+      - name: Compile firmware (offline)
         run: |
-          # Создаём контейнер от образа
-          CONTAINER=$(docker create -it esp-final:latest /bin/bash)
-
-          # Копируем репозиторий внутрь контейнера
-          docker cp $GITHUB_WORKSPACE/. $CONTAINER:/workspace
-
-          # Запускаем сборку от root
-          docker exec -u root -w /workspace $CONTAINER bash -lc "
+          docker run --rm -v $GITHUB_WORKSPACE:/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline-final bash -lc "
             set -euo pipefail
 
-            echo '===== Installing local libraries ====='
+            echo '===== Installing local libraries if missing ====='
             for lib in lib/*; do
               [ -d \"\$lib\" ] || continue
               pio pkg install --library \"\$lib\" || true
@@ -46,20 +39,15 @@ jobs:
             pio run -v
           "
 
-          # Сохраняем контейнер как новый образ с прогретым кешем
-          docker commit $CONTAINER ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-
-          # Удаляем временный контейнер
-          docker rm -f $CONTAINER
-
       # -----------------------------
-      # 4. Проверка кешей внутри образа
+      # 4. Проверка кешей
       # -----------------------------
-      - name: Check cached libraries
+      - name: Check cached libraries and packages
         run: |
-          docker run --rm ghcr.io/dmitry-akva/esp8266-platformio:offline-latest bash -lc "
+          docker run --rm ghcr.io/dmitry-akva/esp8266-platformio:offline-final bash -lc "
             echo '===== Cached packages (.platformio/packages) ====='
-            ls -1 /root/.platformio/packages
+            ls -1 /root/.platformio/packages || echo '(empty)'
+
             echo '===== Cached libraries (.platformio/lib) ====='
             ls -1 /root/.platformio/lib || echo '(empty)'
           "
