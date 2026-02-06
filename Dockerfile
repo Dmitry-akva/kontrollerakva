@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# -------- Установка PlatformIO без кеша pip --------
+# -------- Установка PlatformIO --------
 RUN pip install --no-cache-dir platformio
 
 # -------- Предустановка платформы и тулчейна ESP8266 --------
@@ -24,14 +24,15 @@ RUN pio pkg install --global \
     --tool tool-mkspiffs
 
 # -------- Создаём рабочие папки --------
-RUN mkdir -p /workspace /root/.platformio/lib
+RUN mkdir -p /workspace /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
 
 WORKDIR /workspace
 
-# -------- Копируем локальные библиотеки --------
-COPY lib/ /workspace/lib/
+# -------- Копируем локальные библиотеки сразу в кеш PlatformIO --------
+COPY lib/ /root/.platformio/lib/
 
-# -------- Тестовая "пустая" ини чтобы PIO проиндексировал lib --------
+# -------- Тестовая сборка для кеша всех библиотек --------
+# Создаём временный минимальный проект, чтобы PIO проиндексировал lib/
 RUN echo "[env:nodemcuv2]\nplatform=espressif8266\nboard=nodemcuv2\nframework=arduino" > platformio.ini \
  && mkdir src \
  && echo "void setup(){} void loop(){}" > src/main.cpp \
