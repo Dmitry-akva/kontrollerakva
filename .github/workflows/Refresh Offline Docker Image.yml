@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------
-      # 2. Log in to GHCR (если образ приватный)
+      # 2. Log in to GitHub Container Registry
       # -----------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -26,42 +26,60 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
 
       # -----------------------------
-      # 3. Build base image
+      # 3. Build base image (PlatformIO + deps)
       # -----------------------------
       - name: Build base image
         run: |
           docker build -t esp-base:latest -f Dockerfile.base .
 
       # -----------------------------
-      # 4. Run container and populate PlatformIO cache
+      # 4. Start temporary container and warm PlatformIO cache
       # -----------------------------
       - name: Populate PlatformIO cache in container
         run: |
           set -euo pipefail
-      
-          # Старт контейнера из base-образа
+
+          # Запускаем контейнер ОТ ROOT чтобы были права на /workspace
           docker run --name pio_tmp \
+            -u root \
             -v "${{ github.workspace }}":/workspace \
             -w /workspace \
             -d esp-base:latest tail -f /dev/null
-      
-          # Установка локальных библиотек и прогрев кеша сборкой
+
+          # Установка локальных библиотек и прогрев кеша
           docker exec pio_tmp bash -lc "
             set -euo pipefail
+
             echo 'Installing local libraries...'
             for lib in /workspace/lib/*; do
               [ -d \"\$lib\" ] || continue
               echo \"Installing library: \$lib\"
-              pio lib install \"\$lib\"
+              pio pkg install --library \"\$lib\"
             done
-      
+
             echo 'Running full build to populate cache...'
             pio run -v -j 4
           "
-      
-          # Копируем готовый кеш PlatformIO на хост
+
+          # Копируем кеш PlatformIO на хост
           rm -rf platformio_cache || true
           docker cp pio_tmp:/home/pio/.platformio ./platformio_cache
-      
+
           # Удаляем временный контейнер
           docker rm -f pio_tmp
+
+      # -----------------------------
+      # 5. Build final offline image (contains warmed cache)
+      # -----------------------------
+      - name: Build final offline image
+        run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio
+          TAG_SHA=${GITHUB_SHA::7}
+
+          docker build \
+            -t $IMAGE:offline-$TAG_SHA \
+            -t $IMAGE:offline-latest \
+            -f Dockerfile.final .
+
+          docker push $IMAGE:offline-$TAG_SHA
+          docker push $IMAGE:offline-latest
