@@ -1,4 +1,4 @@
-name: Build ESP8266 Firmware (Offline + Save Cache)
+name: Offline via Docker with one-time cache save
 
 on:
   push:
@@ -8,99 +8,64 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-save-cache:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: 🔑 Login to GHCR
+      - name: Prepare local cache folder
+        run: mkdir -p ${{ github.workspace }}/.pio-cache
+
+      - name: Restore PlatformIO cache
+        id: pio-cache
+        uses: actions/cache@v4
+        with:
+          path: ./.pio-cache
+          # ключ включает hash platformio.ini: при изменении зависимостей кеш обновится
+          key: pio-cache-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            pio-cache-${{ runner.os }}-
+
+      - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: 🔽 Prepare image variable (lowercase)
-        id: img
+      - name: Pull offline PlatformIO image
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          echo "IMAGE=$IMAGE" >> $GITHUB_OUTPUT
+          echo "Using image: $IMAGE"
+          docker pull $IMAGE || true
 
-      - name: 📦 Pull offline PlatformIO image
+      - name: Build firmware (use cache; first run allows network)
         run: |
-          docker pull ${{ steps.img.outputs.IMAGE }}
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          # DEBUG: show whether cache was a hit
+          echo "Cache hit: ${{ steps.pio-cache.outputs.cache-hit }}"
+          # Mount host .pio-cache -> container /platformio, and repo -> /workspace
+          # Ensure container uses /platformio for core/packages
+          if [ "${{ steps.pio-cache.outputs.cache-hit }}" = "true" ]; then
+            docker run --rm \
+              -e PLATFORMIO_CORE_DIR=/platformio \
+              -e PIO_LIB_DIR=/platformio/lib \
+              -v ${{ github.workspace }}/.pio-cache:/platformio \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              $IMAGE \
+              bash -c "pio run --offline"
+          else
+            # first-time: allow network so PlatformIO can install libs into /platformio
+            docker run --rm \
+              -e PLATFORMIO_CORE_DIR=/platformio \
+              -e PIO_LIB_DIR=/platformio/lib \
+              -v ${{ github.workspace }}/.pio-cache:/platformio \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              $IMAGE \
+              bash -c "pio run"
+          fi
 
-      - name: 🔢 Count initial /platformio files in image
-        id: initial
-        run: |
-          IMAGE=${{ steps.img.outputs.IMAGE }}
-          # если /platformio нет, считаем 0
-          INITIAL_COUNT=$(docker run --rm $IMAGE bash -c "if [ -d /platformio ]; then find /platformio -type f | wc -l; else echo 0; fi")
-          echo "initial=$INITIAL_COUNT" >> $GITHUB_OUTPUT
-          echo "Initial count: $INITIAL_COUNT"
-
-      - name: 🛠 Run build (may populate cache) inside named container
-        run: |
-          IMAGE=${{ steps.img.outputs.IMAGE }}
-          # запускаем контейнер с именем, монтируем workspace
-          docker run --name pio_cache_tmp -d \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE bash -c "sleep 1d" >/dev/null
-          # выполняем сборку (в контейнере). allow failure - сборка может вернуть non-zero, но кеш всё равно пополнится
-          docker exec pio_cache_tmp bash -lc "pio run || true"
-        # Если контейнер по какой-то причине повиснет, последующие шаги уберут его.
-
-      - name: 🔢 Count post /platformio files in container
-        id: post
-        run: |
-          INITIAL=${{ steps.initial.outputs.initial }}
-          POST_COUNT=$(docker exec pio_cache_tmp bash -c "if [ -d /platformio ]; then find /platformio -type f | wc -l; else echo 0; fi")
-          echo "post=$POST_COUNT" >> $GITHUB_OUTPUT
-          echo "Initial: $INITIAL   Post: $POST_COUNT"
-
-      - name: 💾 Commit & push updated image if cache increased
-        if: ${{ steps.post.outputs.post && (int(steps.post.outputs.post) > int(steps.initial.outputs.initial)) }}
-        env:
-          IMAGE: ${{ steps.img.outputs.IMAGE }}
-          SHORT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          echo "Cache increased — committing container -> image and pushing."
-          # Tag with SHA as backup and also update :latest
-          SHA_TAG="${IMAGE%:*}:cache-${SHORT_SHA::8}"
-          echo "Committing container to image $IMAGE and $SHA_TAG"
-          docker commit pio_cache_tmp "$IMAGE"
-          docker tag "$IMAGE" "$SHA_TAG"
-          docker push "$IMAGE"
-          docker push "$SHA_TAG"
-          # export /platformio to artifact file
-          mkdir -p ./platformio_cache
-          echo "Copying /platformio from container to runner..."
-          docker cp pio_cache_tmp:/platformio ./platformio_cache || true
-          tar -czf platformio_cache.tar.gz platformio_cache || true
-          ls -lh platformio_cache.tar.gz || true
-
-      - name: 🧹 Cleanup temporary container
-        if: always()
-        run: |
-          docker rm -f pio_cache_tmp || true
-
-      - name: 📤 Upload platformio cache artifact (if present)
-        if: ${{ always() && (steps.post.outputs.post && (int(steps.post.outputs.post) > int(steps.initial.outputs.initial))) }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: platformio-cache
-          path: platformio_cache.tar.gz
-
-      - name: 🧰 Final offline build (use cache in image) and upload firmware
-        run: |
-          IMAGE=${{ steps.img.outputs.IMAGE }}
-          # run final offline build (shouldn't download anything)
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE \
-            pio run
-      - name: 📤 Upload firmware artifacts
+      - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
           name: firmware
