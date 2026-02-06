@@ -1,53 +1,45 @@
-name: Build Firmware Offline (Final)
+name: Build ESP8266 Offline Docker Image
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-offline-final:
+  build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      # -----------------------------
-      # 1. Checkout repository
-      # -----------------------------
-      - name: Checkout repository
+      - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2. Pull offline image с прогретым кешем
-      # -----------------------------
-      - name: Pull offline Docker image
-        run: |
-          docker pull ghcr.io/dmitry-akva/esp8266-platformio:offline-final
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # -----------------------------
-      # 3. Build firmware внутри контейнера
-      # -----------------------------
-      - name: Compile firmware (offline)
-        run: |
-          docker run --rm -v $GITHUB_WORKSPACE:/workspace -w /workspace ghcr.io/dmitry-akva/esp8266-platformio:offline-final bash -lc "
-            set -euo pipefail
+      - name: 🔑 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            echo '===== Installing local libraries if missing ====='
-            for lib in lib/*; do
-              [ -d \"\$lib\" ] || continue
-              pio pkg install --library \"\$lib\" || true
-            done
+      - name: 🏷 Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha
 
-            echo '===== Running full build ====='
-            pio run -v
-          "
-
-      # -----------------------------
-      # 4. Проверка кешей
-      # -----------------------------
-      - name: Check cached libraries and packages
-        run: |
-          docker run --rm ghcr.io/dmitry-akva/esp8266-platformio:offline-final bash -lc "
-            echo '===== Cached packages (.platformio/packages) ====='
-            ls -1 /root/.platformio/packages || echo '(empty)'
-
-            echo '===== Cached libraries (.platformio/lib) ====='
-            ls -1 /root/.platformio/lib || echo '(empty)'
-          "
+      - name: 🧱 Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
