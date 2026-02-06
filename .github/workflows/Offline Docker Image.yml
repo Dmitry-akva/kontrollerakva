@@ -1,38 +1,26 @@
-name: Build ESP8266 Offline Docker Image
+name: Build PlatformIO Offline Image
 
 on:
-
   workflow_dispatch:
+
 
 jobs:
   build-image:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: 🐳 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: 🔑 Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: 🏷 Build and push Docker image
+      - name: Build and push Docker image
         run: |
-          # Приводим имя репозитория к нижнему регистру, чтобы Docker принял тег
-          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          echo "Building and pushing Docker image: $IMAGE"
-          docker buildx build \
-            --iidfile build-iid.txt \
-            --push \
-            -t $IMAGE \
-            .
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):offline-cache
+          echo "Building $IMAGE"
+          docker build -t $IMAGE .
+          docker push $IMAGE
