@@ -13,12 +13,12 @@ jobs:
       IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Log in to GitHub Container Registry
+      - name: Login to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -28,15 +28,14 @@ jobs:
       - name: Pull offline Docker image
         run: docker pull $IMAGE || true
 
-      - name: Determine number of build jobs
-        id: set_jobs
-        run: |
-          JOBS=$(nproc 2>/dev/null || echo 4)
-          echo "jobs=$JOBS" >> $GITHUB_OUTPUT
+      - name: Set build jobs
+        id: jobs
+        run: echo "jobs=$(nproc 2>/dev/null || echo 4)" >> $GITHUB_OUTPUT
 
-      - name: Build firmware fully offline
+      # ================= BUILD =================
+      - name: Build firmware + save log
         run: |
-          JOBS=${{ steps.set_jobs.outputs.jobs }}
+          JOBS=${{ steps.jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
 
           docker run --rm \
@@ -44,30 +43,31 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt
+            bash -lc "pio run -v -j $JOBS" 2>&1 | tee build-log.txt
 
-      - name: Upload firmware binaries
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware
           path: .pio/build/**/firmware*.bin
 
-      # -----------------------------
-      # Публикация лога в gh-pages
-      # -----------------------------
-      - name: Push build log to gh-pages
+      # ================= PUSH LOG TO PAGES =================
+      - name: Publish build log to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
 
-          # Клонируем только ветку gh-pages в отдельную папку
-          git clone --depth 1 --branch gh-pages https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
+          # Клонируем gh-pages с правами на push
+          git clone https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} pages
+          cd pages
+          git checkout gh-pages || git checkout -b gh-pages
 
-          cp build-log.txt gh-pages/build-log.txt
+          # Копируем новый лог
+          cp ../build-log.txt ./build-log.txt
 
-          cd gh-pages
           git add build-log.txt
           git commit -m "Update build log [ci skip]" || echo "No changes"
-          git push
+
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
