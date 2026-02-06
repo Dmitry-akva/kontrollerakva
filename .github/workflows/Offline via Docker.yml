@@ -1,4 +1,4 @@
-name: Build Firmware and Cache (root)
+name: Build Firmware and Preheat Libraries (root)
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
           IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           docker pull $IMAGE_BASE || true
 
-      - name: Build firmware inside container (root)
+      - name: Preheat libraries and build firmware inside container
         run: |
           IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           CONTAINER_ID=$(docker run -d -u root \
@@ -27,19 +27,29 @@ jobs:
             -e PIO_LIB_DIR=/platformio/lib \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            $IMAGE_BASE bash -c "pio run || true")
+            $IMAGE_BASE bash -c "
+              echo '=== Installing libraries to global cache /platformio/lib ==='
+              pio lib install --storage-dir /platformio/lib FastBot
+              pio lib install --storage-dir /platformio/lib OneWire
+              pio lib install --storage-dir /platformio/lib DallasTemperature
+              pio lib install --storage-dir /platformio/lib FileData
+              pio lib install --storage-dir /platformio/lib GyverPortal
+              pio lib install --storage-dir /platformio/lib GyverHC595
+              pio lib install --storage-dir /platformio/lib GTimer
+              echo '=== Building firmware ==='
+              pio run || true
+            ")
           docker wait $CONTAINER_ID
-          echo "Built firmware inside container $CONTAINER_ID"
+          echo "Firmware built and libraries preheated inside container $CONTAINER_ID"
 
-      - name: Commit container as new image with cache
+      - name: Commit container as new image with preheated libraries
         run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
           CONTAINER_ID=$(docker ps -a -q --filter "ancestor=$IMAGE_BASE" | head -n1)
           docker commit $CONTAINER_ID $IMAGE_NEW
           docker push $IMAGE_NEW
 
-      - name: Diagnose PlatformIO cache inside new image
+      - name: Diagnose PlatformIO global cache
         run: |
           IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
           docker run --rm -u root \
@@ -49,9 +59,8 @@ jobs:
             -w /workspace \
             $IMAGE_NEW \
             bash -c "
-              echo '=== PlatformIO cache directories ==='
-              ls -la /platformio
-              ls -la /platformio/lib || echo '/platformio/lib missing'
+              echo '=== PlatformIO global cache ==='
+              ls -la /platformio/lib
               echo
-              echo '=== Build firmware ==='
+              echo '=== Test build firmware ==='
               pio run || echo 'Build failed'"
