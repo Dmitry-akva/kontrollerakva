@@ -1,10 +1,10 @@
 name: Build ESP8266 Offline Docker Image
 
 on:
- workflow_dispatch:
+   workflow_dispatch:
 
 jobs:
-  build:
+  build-image:
     runs-on: ubuntu-latest
 
     permissions:
@@ -23,7 +23,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: 🏷 Extract metadata (tags, labels)
         id: meta
