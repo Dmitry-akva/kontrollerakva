@@ -1,27 +1,16 @@
-# Базовый образ с Python 3.11 и минимальными зависимостями
+# Финальный образ с Python 3.11 и PlatformIO
 FROM python:3.11-slim
 
-# Системные пакеты для PlatformIO и сборки прошивок
+# Системные зависимости для PlatformIO
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
-    python3-dev \
-    curl \
+    git build-essential libffi-dev libssl-dev python3-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка PlatformIO
 RUN pip install --no-cache-dir platformio
 
-# Создаём пользователя pio (можно не использовать, если всё от root)
-RUN useradd -m -s /bin/bash pio || true
-
-# Копируем прогретый кеш (если есть)
-COPY platformio_cache/.platformio /home/pio/.platformio || true
-
 # Рабочая директория проекта
 WORKDIR /workspace
 
 # ENV для PlatformIO
-ENV PLATFORMIO_HOME_DIR=/home/pio/.platformio
+ENV PLATFORMIO_HOME_DIR=/root/.platformio
