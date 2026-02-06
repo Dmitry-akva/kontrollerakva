@@ -56,7 +56,6 @@ jobs:
           name: firmware
           path: .pio/build/**/firmware*.bin
 
-      # 🚀 ПУШ ЛОГА В gh-pages
       - name: Push build log to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
@@ -64,11 +63,15 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git fetch origin gh-pages || git checkout --orphan gh-pages
-          git checkout gh-pages || git checkout -b gh-pages
+          # Клонируем ТОЛЬКО ветку gh-pages в отдельную папку
+          git clone --depth 1 --branch gh-pages https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages-dir || \
+          git clone --depth 1 https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages-dir
 
-          cp build-log.txt build-log.txt
+          cd gh-pages-dir
+
+          # Копируем свежий лог
+          cp ../build-log.txt ./build-log.txt
 
           git add build-log.txt
           git commit -m "Update build log [ci skip]" || echo "No changes"
-          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages --force
+          git push
