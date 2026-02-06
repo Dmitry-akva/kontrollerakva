@@ -25,7 +25,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Pull offline Docker image (if not present)
+      - name: Pull offline Docker image
         run: docker pull $IMAGE || true
 
       - name: Determine number of build jobs
@@ -34,36 +34,40 @@ jobs:
           JOBS=$(nproc 2>/dev/null || echo 4)
           echo "jobs=$JOBS" >> $GITHUB_OUTPUT
 
-      - name: Check installed PlatformIO packages
-        run: |
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
-
-      # 🔥 СБОРКА + ЗАПИСЬ ЛОГА С ОШИБКАМИ
       - name: Build firmware fully offline
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
-          docker run --rm \
-            --network none \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc "pio run -v -j $JOBS" > build-log.txt 2>&1 || true
 
-      - name: Upload firmware binary(s)
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: .pio/build/**/firmware*.bin
-
-      - name: Build firmware fully offline
-        run: |
-          JOBS=${{ steps.set_jobs.outputs.jobs }}
-          echo "Running PlatformIO fully offline with -j $JOBS"
-      
           docker run --rm \
             --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
             bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt
+
+      - name: Upload firmware binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: .pio/build/**/firmware*.bin
+
+      # -----------------------------
+      # Публикация лога в gh-pages
+      # -----------------------------
+      - name: Push build log to gh-pages
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          # Клонируем только ветку gh-pages в отдельную папку
+          git clone --depth 1 --branch gh-pages https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
+
+          cp build-log.txt gh-pages/build-log.txt
+
+          cd gh-pages
+          git add build-log.txt
+          git commit -m "Update build log [ci skip]" || echo "No changes"
+          git push
