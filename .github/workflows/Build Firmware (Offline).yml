@@ -6,17 +6,14 @@ on:
 jobs:
   build-firmware:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
-      # -----------------------------
-      # 1. Checkout repository
-      # -----------------------------
-      - name: Checkout code
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2. Log in to GHCR (если образ приватный)
-      # -----------------------------
+      # 2️⃣ Log in to GHCR (если образ приватный)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -24,29 +21,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # -----------------------------
-      # 3. Build firmware inside offline container
-      # -----------------------------
-      - name: Build firmware in container
+      # 3️⃣ Build firmware using offline image
+      - name: Build firmware
         run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
           docker run --rm \
             -u root \
-            -v ${{ github.workspace }}:/workspace \
+            -v "${{ github.workspace }}":/workspace \
             -w /workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
+            $IMAGE \
             bash -lc "
               set -euo pipefail
-              echo 'Running firmware build using local libraries only...'
+              echo '===== Running firmware build ====='
               pio run -v -j 4
             "
 
-                  
-
-      # -----------------------------
-      # 4. Upload firmware binaries
-      # -----------------------------
-      - name: Upload firmware binaries
-        uses: actions/upload-artifact@v4
-        with:
-          name: firmware
-          path: .pio/build/**/*.bin
+      # 4️⃣ List output binaries
+      - name: Show build artifacts
+        run: |
+          echo "===== Firmware binaries ====="
+          ls -lh .pio/build/nodemcuv2/*.bin || echo "(no binaries found)"
