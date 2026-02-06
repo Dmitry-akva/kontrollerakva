@@ -48,7 +48,7 @@ jobs:
               -v ${{ github.workspace }}:/workspace \
               -w /workspace \
               $IMAGE \
-              bash -c "pio run --offline"
+              bash -c "pio run"
           fi
 
       - name: Save PlatformIO cache as artifact
