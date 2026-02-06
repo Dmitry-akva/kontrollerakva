@@ -36,10 +36,11 @@ jobs:
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           docker run --rm \
+            --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            pio run --network none
+            pio run
 
       - name: 📤 Upload firmware artifacts
         uses: actions/upload-artifact@v4
