@@ -12,45 +12,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Log in to GitHub Container Registry ---
-      - name: Log in to GHCR
+      # --- Log in to GHCR ---
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # --- Build initial offline image ---
-      - name: Build base offline image
+      # --- Build new offline image ---
+      - name: Build Docker image with cached libs
         run: |
           docker build --pull -t ghcr.io/dmitry-akva/esp8266-platformio:offline-latest .
 
-      # --- Start container для кеша ---
-      - name: Start container for caching
+      # --- Start temporary container to verify caches ---
+      - name: Start temporary container
         run: |
           docker run --name pio_cache_builder \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             -d ghcr.io/dmitry-akva/esp8266-platformio:offline-latest tail -f /dev/null
 
-      # --- Создание папок кеша внутри контейнера ---
-      - name: Initialize PlatformIO cache
+      # --- Проверка кеша библиотек ---
+      - name: List cached libraries in container
+        run: |
+          docker exec pio_cache_builder bash -lc "ls -R /root/.platformio/lib"
+
+      # --- Тестовая сборка в контейнере (offline) ---
+      - name: Test offline build in container
         run: |
           docker exec pio_cache_builder bash -lc "
-            mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
+            echo '[env:nodemcuv2]\nplatform=espressif8266\nboard=nodemcuv2\nframework=arduino' > platformio.ini
+            mkdir -p src
+            echo 'void setup(){} void loop(){}' > src/main.cpp
+            pio run -e nodemcuv2 -v -j 4 || true
+            rm -rf src platformio.ini .pio
           "
 
-      # --- Копируем библиотеки в образ и запускаем сборку для кеша ---
-      - name: Populate PlatformIO cache with local libs
-        run: |
-          docker exec pio_cache_builder bash -lc "
-            # Копируем lib/ из репозитория в кеш PIO
-            cp -r /workspace/lib/* /root/.platformio/lib/
-            echo 'Building firmware to populate cache...'
-            pio run -v -j 4
-          "
-
-      # --- Commit container as new offline image ---
+      # --- Commit контейнер как новый offline image ---
       - name: Commit container as new offline image
         run: docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
