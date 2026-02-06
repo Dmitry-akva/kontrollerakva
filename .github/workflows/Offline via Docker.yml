@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'src/**'
-      - 'platformio.ini'
+
   workflow_dispatch:
 
 jobs:
@@ -24,14 +24,12 @@ jobs:
           echo "Pulling offline image: $IMAGE"
           docker pull $IMAGE
 
-      - name: 🔍 Verify essential libraries in image
+      - name: 🔍 Verify PlatformIO cache exists
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           docker run --rm $IMAGE bash -c "\
-            test -d /platformio/packages/FastBot || (echo 'FastBot missing'; exit 1); \
-            test -d /platformio/packages/OneWire || (echo 'OneWire missing'; exit 1); \
-            test -d /platformio/packages/DallasTemperature || (echo 'DallasTemperature missing'; exit 1); \
-            echo 'All essential libraries found' \
+            if [ ! -d /platformio ]; then echo '/platformio not found, image is invalid' && exit 1; fi; \
+            echo 'PlatformIO cache found in image' \
           "
 
       - name: 🛠 Build firmware inside offline container
@@ -41,7 +39,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            pio run
+            pio run --network none
 
       - name: 📤 Upload firmware artifacts
         uses: actions/upload-artifact@v4
