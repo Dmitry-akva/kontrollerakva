@@ -11,40 +11,42 @@ jobs:
       # -----------------------------
       # 1. Checkout repository
       # -----------------------------
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       # -----------------------------
-      # 2. Build final offline image
+      # 2. Build final Docker image (Python + PlatformIO)
       # -----------------------------
       - name: Build Docker image
         run: |
           docker build -t esp-final:latest -f Dockerfile.final .
 
       # -----------------------------
-      # 3. Create container, copy project, compile
+      # 3. Create container, copy project, compile firmware
       # -----------------------------
       - name: Compile firmware inside container
         run: |
-          # Создаём контейнер
+          # Создаём контейнер от образа
           CONTAINER=$(docker create -it esp-final:latest /bin/bash)
-          
-          # Копируем весь репозиторий внутрь контейнера
+
+          # Копируем репозиторий внутрь контейнера
           docker cp $GITHUB_WORKSPACE/. $CONTAINER:/workspace
 
           # Запускаем сборку от root
-          docker start -ai $CONTAINER bash -c "
-            cd /workspace
+          docker exec -u root -w /workspace $CONTAINER bash -lc "
+            set -euo pipefail
+
             echo '===== Installing local libraries ====='
             for lib in lib/*; do
               [ -d \"\$lib\" ] || continue
-              pio pkg install --library \"\$lib\"
+              pio pkg install --library \"\$lib\" || true
             done
+
             echo '===== Running full build ====='
             pio run -v
           "
 
-          # Сохраняем состояние контейнера в образ
+          # Сохраняем контейнер как новый образ с прогретым кешем
           docker commit $CONTAINER ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
           # Удаляем временный контейнер
@@ -56,8 +58,8 @@ jobs:
       - name: Check cached libraries
         run: |
           docker run --rm ghcr.io/dmitry-akva/esp8266-platformio:offline-latest bash -lc "
-            echo '===== Cached packages ====='
+            echo '===== Cached packages (.platformio/packages) ====='
             ls -1 /root/.platformio/packages
-            echo '===== Cached libs ====='
+            echo '===== Cached libraries (.platformio/lib) ====='
             ls -1 /root/.platformio/lib || echo '(empty)'
           "
