@@ -8,21 +8,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Скачиваем код репозитория
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Логинимся в GHCR
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      # 3️⃣ Забираем существующий образ PlatformIO
       - name: Pull existing PlatformIO image
         run: |
           IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           docker pull $IMAGE_BASE || true
 
+      # 4️⃣ Прогреваем библиотеки и собираем прошивку от root
       - name: Preheat libraries and build firmware inside container
         run: |
           IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          CONTAINER_ID=$(docker run -d -u root \
+          CONTAINER_NAME=preheat_build
+          docker run -d --name $CONTAINER_NAME -u root \
             -e PLATFORMIO_CORE_DIR=/platformio \
             -e PIO_LIB_DIR=/platformio/lib \
             -v ${{ github.workspace }}:/workspace \
@@ -38,17 +43,20 @@ jobs:
               pio lib install --storage-dir /platformio/lib GTimer
               echo '=== Building firmware ==='
               pio run || true
-            ")
-          docker wait $CONTAINER_ID
-          echo "Firmware built and libraries preheated inside container $CONTAINER_ID"
+            "
+          docker wait $CONTAINER_NAME
+          echo "Firmware built and libraries preheated inside container $CONTAINER_NAME"
 
+      # 5️⃣ Сохраняем контейнер как новый образ и пушим
       - name: Commit container as new image with preheated libraries
         run: |
           IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
-          CONTAINER_ID=$(docker ps -a -q --filter "ancestor=$IMAGE_BASE" | head -n1)
-          docker commit $CONTAINER_ID $IMAGE_NEW
+          CONTAINER_NAME=preheat_build
+          docker commit $CONTAINER_NAME $IMAGE_NEW
           docker push $IMAGE_NEW
+          docker rm $CONTAINER_NAME
 
+      # 6️⃣ Диагностика кеша и тест сборки
       - name: Diagnose PlatformIO global cache
         run: |
           IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
@@ -59,7 +67,7 @@ jobs:
             -w /workspace \
             $IMAGE_NEW \
             bash -c "
-              echo '=== PlatformIO global cache ==='
+              echo '=== PlatformIO global cache (/platformio/lib) ==='
               ls -la /platformio/lib
               echo
               echo '=== Test build firmware ==='
