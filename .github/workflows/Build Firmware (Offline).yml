@@ -1,19 +1,23 @@
-name: Build Firmware Using Offline Docker Image
+name: Build Firmware Fully Offline (with Cache Check)
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-firmware:
+  offline-build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
+      # -----------------------------
       # 1️⃣ Checkout repository
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
       # 2️⃣ Log in to GHCR (если образ приватный)
+      # -----------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -21,11 +25,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3️⃣ Build firmware using offline image
-      - name: Build firmware
+      # -----------------------------
+      # 3️⃣ List cached libs and packages in image
+      # -----------------------------
+      - name: Check cached PlatformIO contents
         run: |
           IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-
           docker run --rm \
             -u root \
             -v "${{ github.workspace }}":/workspace \
@@ -33,12 +38,50 @@ jobs:
             $IMAGE \
             bash -lc "
               set -euo pipefail
-              echo '===== Running firmware build ====='
+              echo '===== PLATFORMIO HOME DIR ====='
+              echo \$PLATFORMIO_HOME_DIR
+              echo
+              echo '===== Cached libraries (.platformio/lib) ====='
+              [ -d \$PLATFORMIO_HOME_DIR/lib ] && ls -1 \$PLATFORMIO_HOME_DIR/lib || echo '(empty)'
+              echo
+              echo '===== Cached packages (.platformio/packages) ====='
+              [ -d \$PLATFORMIO_HOME_DIR/packages ] && ls -1 \$PLATFORMIO_HOME_DIR/packages || echo '(empty)'
+              echo
+              echo '===== Local project lib/ ====='
+              [ -d lib ] && ls -1 lib || echo '(empty)'
+              echo
+              echo '===== Tree of first-level cache ====='
+              [ -d \$PLATFORMIO_HOME_DIR ] && ls -1 \$PLATFORMIO_HOME_DIR || echo '(empty)'
+            "
+
+      # -----------------------------
+      # 4️⃣ Build firmware offline
+      # -----------------------------
+      - name: Build firmware offline
+        run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+          docker run --rm \
+            -u root \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace \
+            $IMAGE \
+            bash -lc "
+              set -euo pipefail
+              echo '===== Installing local libraries into cache ====='
+              for lib in lib/*; do
+                [ -d \"\$lib\" ] || continue
+                echo \"Installing library: \$lib\"
+                pio pkg install --library \$lib
+              done
+              echo '===== Running full firmware build ====='
               pio run -v -j 4
             "
 
-      # 4️⃣ List output binaries
-      - name: Show build artifacts
-        run: |
-          echo "===== Firmware binaries ====="
-          ls -lh .pio/build/nodemcuv2/*.bin || echo "(no binaries found)"
+      # -----------------------------
+      # 5️⃣ Upload firmware binaries
+      # -----------------------------
+      - name: Upload firmware binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware-binaries
+          path: .pio/build/nodemcuv2/*.bin
