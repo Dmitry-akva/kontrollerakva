@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 
 # -----------------------------
-# Системные пакеты для PlatformIO и сборки прошивок
+# Системные зависимости для PlatformIO
 # -----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git build-essential libffi-dev libssl-dev python3-dev curl \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir platformio
 
 # -----------------------------
-# Рабочая директория
+# Рабочая директория внутри контейнера
 # -----------------------------
 WORKDIR /workspace
 
@@ -23,23 +23,5 @@ WORKDIR /workspace
 # -----------------------------
 ENV PLATFORMIO_HOME_DIR=/root/.platformio
 
-# -----------------------------
-# Пользователь root для offline-сборки
-# -----------------------------
+# По умолчанию используем root
 USER root
-
-# -----------------------------
-# Прогреваем кеш локальных библиотек и билдим прошивку
-# -----------------------------
-# Предполагается, что проект монтируется в /workspace при docker build или docker run
-# Команда ниже — пример, для workflow лучше запускать через RUN или docker exec
-# -----------------------------
-# RUN bash -c "\
-#     for lib in /workspace/lib/*; do \
-#         [ -d \"\$lib\" ] || continue; \
-#         echo Installing library: \$lib; \
-#         pio pkg install --library \$lib; \
-#     done && \
-#     echo Running full build to populate cache... && \
-#     pio run -v -j 4 \
-# "
