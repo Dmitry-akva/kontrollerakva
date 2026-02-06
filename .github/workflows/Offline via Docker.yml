@@ -1,4 +1,4 @@
-name: Offline via Docker with one-time cache save
+name: Offline via Docker
 
 on:
   push:
@@ -18,43 +18,19 @@ jobs:
       - name: Prepare local cache folder
         run: mkdir -p ${{ github.workspace }}/.pio-cache
 
-      - name: Restore PlatformIO cache
-        id: pio-cache
-        uses: actions/cache@v4
-        with:
-          path: ./.pio-cache
-          # ключ включает hash platformio.ini: при изменении зависимостей кеш обновится
-          key: pio-cache-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
-          restore-keys: |
-            pio-cache-${{ runner.os }}-
-
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull offline PlatformIO image
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          echo "Using image: $IMAGE"
           docker pull $IMAGE || true
 
-      - name: Build firmware (use cache; first run allows network)
+      - name: Build firmware (root, allow network if cache empty)
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          # DEBUG: show whether cache was a hit
-          echo "Cache hit: ${{ steps.pio-cache.outputs.cache-hit }}"
-          # Mount host .pio-cache -> container /platformio, and repo -> /workspace
-          # Ensure container uses /platformio for core/packages
-          if [ "${{ steps.pio-cache.outputs.cache-hit }}" = "true" ]; then
-            docker run --rm \
-              -e PLATFORMIO_CORE_DIR=/platformio \
-              -e PIO_LIB_DIR=/platformio/lib \
-              -v ${{ github.workspace }}/.pio-cache:/platformio \
-              -v ${{ github.workspace }}:/workspace \
-              -w /workspace \
-              $IMAGE \
-              bash -c "pio run --offline"
-          else
-            # first-time: allow network so PlatformIO can install libs into /platformio
+          if [ ! -d ${{ github.workspace }}/.pio-cache ]; then
+            echo "Cache missing, running first build with network"
             docker run --rm \
               -e PLATFORMIO_CORE_DIR=/platformio \
               -e PIO_LIB_DIR=/platformio/lib \
@@ -63,7 +39,23 @@ jobs:
               -w /workspace \
               $IMAGE \
               bash -c "pio run"
+          else
+            echo "Cache found, running offline"
+            docker run --rm \
+              -e PLATFORMIO_CORE_DIR=/platformio \
+              -e PIO_LIB_DIR=/platformio/lib \
+              -v ${{ github.workspace }}/.pio-cache:/platformio \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              $IMAGE \
+              bash -c "pio run --offline"
           fi
+
+      - name: Save PlatformIO cache as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pio-cache
+          path: ./.pio-cache
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
