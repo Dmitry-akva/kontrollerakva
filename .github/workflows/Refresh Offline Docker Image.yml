@@ -1,4 +1,4 @@
-name: Build Offline ESP8266 Image (Root Mode, Fixed)
+name: Build Offline ESP8266 Image (Root Mode, Full Cache)
 
 on:
   workflow_dispatch:
@@ -26,8 +26,8 @@ jobs:
         run: |
           docker build -t esp-final:latest -f Dockerfile.final .
 
-      # 4️⃣ Run firmware build to populate PlatformIO cache
-      - name: Build firmware (creates PlatformIO cache)
+      # 4️⃣ Run firmware build and populate PlatformIO cache (packages + local libs)
+      - name: Populate PlatformIO cache
         run: |
           docker run --name pio_tmp \
             -u root \
@@ -36,7 +36,15 @@ jobs:
             esp-final:latest \
             bash -lc "
               set -euo pipefail
-              echo 'Running full build to populate PlatformIO cache...'
+
+              echo '===== Installing local libraries into cache ====='
+              for lib in /workspace/lib/*; do
+                [ -d \"\$lib\" ] || continue
+                echo \"Installing \$lib...\"
+                pio pkg install --library \"\$lib\"
+              done
+
+              echo '===== Running full firmware build to populate packages cache ====='
               pio run -v -j 4
             "
 
@@ -47,7 +55,7 @@ jobs:
           docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
           docker rm -f pio_tmp
 
-      # 6️⃣ Verify cached libraries in final image
+      # 6️⃣ Verify cached libraries and packages
       - name: Check cached libraries and packages
         run: |
           IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
