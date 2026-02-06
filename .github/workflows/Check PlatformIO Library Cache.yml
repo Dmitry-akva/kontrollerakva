@@ -1,46 +1,46 @@
-name: Check PlatformIO Library Cache (use existing GHCR image)
+name: Check PlatformIO Cache in Docker Image
 
 on:
   workflow_dispatch:
 
 jobs:
-  check-libs:
+  check-cache:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      # 1. Проверяем код (можно пустой checkout, но удобно для проекта)
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # --------- логин в GHCR (обязательно если образ приватный) ----------
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}   # секрет должен содержать токен с read:packages
+      # 2. Логинимся в GHCR
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Pull GHCR image (explicit)
+      # 3. Подтягиваем образ с прошивкой и кешем
+      - name: Pull firmware image
         run: |
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-          echo "Trying to pull $IMAGE"
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
           docker pull $IMAGE
-          docker images | grep esp8266-platformio || true
 
-      - name: List cached PlatformIO libraries from the image
+      # 4. Проверяем содержимое кеша и версию библиотек
+      - name: Inspect PlatformIO cache
         run: |
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc "
-              echo 'PLATFORMIO_HOME_DIR=' \$PLATFORMIO_HOME_DIR || true
-              echo '===== Cached libraries in image ====='
-              ls -1 /home/pio/.platformio/lib || echo '(no cache dir or not found)'
-              echo
-              echo '===== Local project lib/ ====='
-              ls -1 lib || echo '(no project lib dir)'
-              echo
-              echo '===== Tree of cache (first-level) ====='
-              for d in /home/pio/.platformio/lib/*; do [ -d \"\$d\" ] && echo \"- \$d\"; done || true
-            "
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
+          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace $IMAGE bash -c "
+            echo '=== PlatformIO cache directories ==='
+            ls -la /platformio
+            ls -la /platformio/lib
+            echo
+            echo '=== Installed libraries in cache ==='
+            pio lib list
+            echo
+            echo '=== Check offline build ==='
+            pio run --offline
+          "
+
+      # 5. Загрузка артефактов (опционально)
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-check
+          path: .pio/build/*/*.bin
