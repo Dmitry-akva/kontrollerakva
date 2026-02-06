@@ -35,7 +35,7 @@ jobs:
             pio lib list
             echo
             echo '=== Check offline build ==='
-            pio run --offline
+            pio run
           "
 
       # 5. Загрузка артефактов (опционально)
