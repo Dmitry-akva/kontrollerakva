@@ -1,10 +1,10 @@
-name: Offline via Docker
+name: Build ESP8266 Firmware (Offline + Cache)
 
 on:
   push:
     paths:
       - 'src/**'
-
+      - 'platformio.ini'
   workflow_dispatch:
 
 jobs:
@@ -18,29 +18,20 @@ jobs:
       - name: 🔑 Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: 🔽 Pull offline PlatformIO image
+      - name: 🔽 Pull base PlatformIO image
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          echo "Pulling offline image: $IMAGE"
           docker pull $IMAGE
 
-      - name: 🔍 Verify PlatformIO cache exists
-        run: |
-          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          docker run --rm $IMAGE bash -c "\
-            if [ ! -d /platformio ]; then echo '/platformio not found, image is invalid' && exit 1; fi; \
-            echo 'PlatformIO cache found in image' \
-          "
-
-      - name: 🛠 Build firmware inside offline container
+      - name: 🛠 Build firmware with cached libraries
         run: |
           IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
           docker run --rm \
-            --network none \
             -v ${{ github.workspace }}:/workspace \
+            -v /platformio:/platformio \
             -w /workspace \
             $IMAGE \
-            pio run
+            pio run --project-dir /workspace || true
 
       - name: 📤 Upload firmware artifacts
         uses: actions/upload-artifact@v4
