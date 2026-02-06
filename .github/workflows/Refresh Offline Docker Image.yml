@@ -1,4 +1,4 @@
-name: Refresh Offline Docker Image
+name: Build Offline ESP8266 Image (with warmed PlatformIO cache)
 
 on:
   workflow_dispatch:
@@ -6,11 +6,18 @@ on:
 jobs:
   build-offline-image:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
 
     steps:
+      # -----------------------------
+      # 1. Checkout repository
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Log in to GHCR (если образ приватный)
+      # -----------------------------
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -18,10 +25,59 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Build offline Docker image with preloaded libraries
+      # -----------------------------
+      # 3. Build base image
+      # -----------------------------
+      - name: Build base image
+        run: |
+          docker build -t esp-base:latest -f Dockerfile.base .
+
+      # -----------------------------
+      # 4. Run container and populate PlatformIO cache
+      # -----------------------------
+      - name: Populate PlatformIO cache in container
+        run: |
+          set -euo pipefail
+
+          # старт контейнера из base image
+          docker run --name pio_tmp -v "${{ github.workspace }}":/workspace -w /workspace -d esp-base:latest tail -f /dev/null
+
+          # установка локальных библиотек и прогон сборки для кеша
+          docker exec pio_tmp bash -lc "set -euo pipefail; \
+            mkdir -p /home/pio/.platformio; \
+            echo 'Installing local libraries...' | tee /workspace/pio_cache_build.log; \
+            for lib in /workspace/lib/*; do \
+              [ -d \"\$lib\" ] || continue; \
+              echo \"Installing library: \$lib\" | tee -a /workspace/pio_cache_build.log; \
+              pio lib install \"\$lib\" 2>&1 | tee -a /workspace/pio_cache_build.log; \
+            done; \
+            echo 'Running full build to populate cache...' | tee -a /workspace/pio_cache_build.log; \
+            pio run -v -j 4 2>&1 | tee -a /workspace/pio_cache_build.log; \
+          "
+
+          # копирование подготовленного кеша на хост
+          rm -rf platformio_cache || true
+          docker cp pio_tmp:/home/pio/.platformio ./platformio_cache
+
+          # удаление временного контейнера
+          docker rm -f pio_tmp
+
+      # -----------------------------
+      # 5. Upload build log
+      # -----------------------------
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: pio-cache-build-log
+          path: pio_cache_build.log
+
+      # -----------------------------
+      # 6. Build final offline image
+      # -----------------------------
+      - name: Build final offline image
         run: |
           IMAGE=ghcr.io/dmitry-akva/esp8266-platformio
           TAG_SHA=${GITHUB_SHA::7}
-          docker build -t $IMAGE:offline-$TAG_SHA -t $IMAGE:offline-latest .
+          docker build -t $IMAGE:offline-$TAG_SHA -t $IMAGE:offline-latest -f Dockerfile.final .
           docker push $IMAGE:offline-$TAG_SHA
           docker push $IMAGE:offline-latest
