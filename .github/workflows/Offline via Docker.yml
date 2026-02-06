@@ -1,4 +1,4 @@
-name: Build Firmware and Preheat Libraries (root, auto lib_deps)
+name: Build Firmware and Preheat Libraries (root, safe lib_deps)
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Parse lib_deps from platformio.ini
+      # 2️⃣ Parse lib_deps from platformio.ini (safe for GitHub Actions)
       - name: Parse lib_deps from platformio.ini
         id: parse_libs
         run: |
@@ -34,11 +34,16 @@ jobs:
           for l in libs:
               if l not in seen:
                   seen.add(l)
-                  out.append(l)
-          print("|".join(out))
+                  out.append(l.replace('"','').replace("\n",""))
+          print(",".join(out))
           PY
           )
-                    echo "libs=$LIBS" >> $GITHUB_OUTPUT
+          # Экранируем спецсимволы для GITHUB_OUTPUT
+          LIBS_ESCAPED=${LIBS//'%'/'%25'}
+          LIBS_ESCAPED=${LIBS_ESCAPED//$'\n'/'%0A'}
+          LIBS_ESCAPED=${LIBS_ESCAPED//$'\r'/'%0D'}
+          LIBS_ESCAPED=${LIBS_ESCAPED//'='/'%3D'}
+          echo "libs=$LIBS_ESCAPED" >> $GITHUB_OUTPUT
 
       # 3️⃣ Login to GHCR
       - name: Login to GHCR
@@ -67,7 +72,7 @@ jobs:
               set -e
               echo "LIBS=$LIBS"
               if [ -n "$LIBS" ]; then
-                for lib in $(echo "$LIBS" | tr "|" " "); do
+                for lib in $(echo "$LIBS" | tr "," " "); do
                   echo "Installing library: $lib"
                   pio lib install --storage-dir /platformio/lib "$lib" || true
                 done
