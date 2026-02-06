@@ -27,7 +27,7 @@ jobs:
       # -----------------------------
       # 3. Build firmware inside offline container
       # -----------------------------
-      - name: Build firmware in container
+      - name: Build firmware in container (offline)
         run: |
           docker run --rm \
             -u root \
@@ -36,17 +36,12 @@ jobs:
             ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
             bash -lc "
               set -euo pipefail
-
-              echo 'Installing local libraries...'
-              for lib in /workspace/lib/*; do
-                [ -d \"\$lib\" ] || continue
-                echo Installing \$lib
-                pio pkg install --library \"\$lib\"
-              done
-
-              echo 'Running firmware build...'
-              pio run -v -j 4
+      
+              echo 'Running offline firmware build...'
+              pio run -v -j 4 --offline
             "
+      
+                  "
 
       # -----------------------------
       # 4. Upload firmware binaries
