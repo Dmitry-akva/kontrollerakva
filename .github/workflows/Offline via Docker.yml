@@ -1,57 +1,36 @@
-name: Build Firmware and Save Docker Image (root)
+name: Build Firmware Offline
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/**'
-      - 'platformio.ini'
+
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Проверяем код
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 2. Логинимся в GHCR
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # 3. Подтягиваем базовый образ с PlatformIO и кешем
-      - name: Pull base image
+      - name: Pull offline image
         run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          docker pull $IMAGE_BASE || true
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):offline-cache
+          docker pull $IMAGE
 
-      # 4. Собираем прошивку внутри контейнера (root)
-      - name: Build firmware inside Docker
+      - name: Build firmware (offline)
         run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):offline-cache
           docker run --rm \
             -e PLATFORMIO_CORE_DIR=/platformio \
             -e PIO_LIB_DIR=/platformio/lib \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            $IMAGE_BASE \
-            bash -c "pio run"
+            $IMAGE \
+            pio run
 
-      # 5. Создаём новый образ, который уже содержит прошивку
-      - name: Commit firmware into new Docker image
-        run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
-          docker build --build-arg BASE_IMAGE=$IMAGE_BASE -f Dockerfile.firmware -t $IMAGE_NEW .
-
-      # 6. Пушим новый образ с прошивкой и кешем
-      - name: Push new image
-        run: |
-          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
-          docker push $IMAGE_NEW
-
-      # 7. Загружаем бинарники прошивки как артефакт
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
         with:
