@@ -1,5 +1,4 @@
-name: Build ESP8266 Firmware (Offline + Cache)
-
+name: Offline via Docker
 on:
   push:
     paths:
