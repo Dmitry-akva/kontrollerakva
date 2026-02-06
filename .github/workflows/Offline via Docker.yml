@@ -30,7 +30,7 @@ jobs:
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            pio run --offline
+            pio run
 
       - name: 📤 Upload firmware artifacts
         uses: actions/upload-artifact@v4
