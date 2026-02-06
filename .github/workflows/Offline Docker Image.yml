@@ -1,6 +1,7 @@
 name: Build ESP8266 Offline Docker Image
 
 on:
+
   workflow_dispatch:
 
 jobs:
@@ -26,8 +27,12 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
 
       - name: 🏷 Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository }}:latest
+        run: |
+          # Приводим имя репозитория к нижнему регистру, чтобы Docker принял тег
+          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          echo "Building and pushing Docker image: $IMAGE"
+          docker buildx build \
+            --iidfile build-iid.txt \
+            --push \
+            -t $IMAGE \
+            .
