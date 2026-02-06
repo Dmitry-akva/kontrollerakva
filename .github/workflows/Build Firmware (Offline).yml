@@ -2,10 +2,6 @@ name: Build Firmware (Fully Offline)
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/**'
-   
 
 jobs:
   build-offline:
@@ -16,9 +12,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false  # важно! чтобы push шёл через GH_PAT
-
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -57,7 +50,7 @@ jobs:
           echo "Running PlatformIO fully offline with -j $JOBS"
           # Выводим лог прямо в рабочую папку на GitHub runner
           docker run --rm \
-            # --network none \
+            --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
@@ -71,13 +64,3 @@ jobs:
         with:
           name: firmware
           path: .pio/build/**/firmware*.bin
-
-      - name: Commit build log
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add build-log.txt
-          git commit -m "Update build log" || echo "No changes"
-          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} HEAD:main
