@@ -50,7 +50,7 @@ jobs:
           echo "Running PlatformIO fully offline with -j $JOBS"
           # Выводим лог прямо в рабочую папку на GitHub runner
           docker run --rm \
-            --network none \
+            
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
