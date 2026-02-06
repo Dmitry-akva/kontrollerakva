@@ -1,8 +1,8 @@
-# Финальный образ с Python 3.11 и PlatformIO
+# Финальный образ с Python 3.11, PlatformIO и прогретым кешем
 FROM python:3.11-slim
 
 # -----------------------------
-# Системные зависимости для PlatformIO
+# Системные зависимости
 # -----------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git build-essential libffi-dev libssl-dev python3-dev curl \
@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir platformio
 
 # -----------------------------
-# Рабочая директория внутри контейнера
+# Рабочая директория
 # -----------------------------
 WORKDIR /workspace
 
@@ -23,5 +23,24 @@ WORKDIR /workspace
 # -----------------------------
 ENV PLATFORMIO_HOME_DIR=/root/.platformio
 
-# По умолчанию используем root
+# -----------------------------
+# Используем root для всех операций
+# -----------------------------
 USER root
+
+# -----------------------------
+# Копируем локальные библиотеки проекта (чтобы прогреть кеш)
+# -----------------------------
+COPY lib/ /tmp/lib/
+
+# -----------------------------
+# Прогреваем кеш PlatformIO
+# -----------------------------
+RUN set -euo pipefail && \
+    mkdir -p /root/.platformio/lib /root/.platformio/packages && \
+    for lib in /tmp/lib/*; do \
+        [ -d "$lib" ] || continue; \
+        echo "Installing library: $lib"; \
+        pio pkg install --library "$lib" || true; \
+    done && \
+    echo "PlatformIO cache is warmed"
