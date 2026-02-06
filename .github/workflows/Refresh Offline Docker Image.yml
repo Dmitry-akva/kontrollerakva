@@ -1,4 +1,4 @@
-name: Build Offline ESP8266 Image (Root mode)
+name: Build Offline ESP8266 Image (Root Mode with Cache Check)
 
 on:
   workflow_dispatch:
@@ -9,11 +9,11 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      # 1. Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Log in to GHCR
+      # 2️⃣ Log in to GHCR
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -21,66 +21,50 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # 3. Build base image
-      - name: Build base image
+      # 3️⃣ Build final image (Python + PlatformIO)
+      - name: Build final image
         run: |
-          docker build -t esp-base:latest -f Dockerfile.base .
+          docker build -t esp-final:latest -f Dockerfile.final .
 
-      # 4. Start container от root и прогрев кеша
-      - name: Populate PlatformIO cache
+      # 4️⃣ Run firmware build to populate PlatformIO cache
+      - name: Build firmware (creates PlatformIO cache)
         run: |
-          docker run --name pio_tmp \
+          docker run --rm \
             -u root \
             -v "${{ github.workspace }}":/workspace \
             -w /workspace \
-            -d esp-base:latest tail -f /dev/null
+            esp-final:latest \
+            bash -lc "
+              set -euo pipefail
+              echo 'Running full build to populate PlatformIO cache...'
+              pio run -v -j 4
+            "
 
-          # Установка локальных библиотек и прогрев кеша
-          docker exec pio_tmp bash -lc "
-            set -euo pipefail
-            echo 'Installing local libraries...'
-            for lib in /workspace/lib/*; do
-              [ -d \"\$lib\" ] || continue
-              echo \"Installing library: \$lib\"
-              pio pkg install --library \"\$lib\"
-            done
-            echo 'Running full build to populate cache...'
-            pio run -v -j 4
-          "
-
-          # Копируем кеш на хост
-          rm -rf platformio_cache || true
-          mkdir -p platformio_cache
-          docker cp pio_tmp:/home/pio/.platformio ./platformio_cache/.platformio
-
-          # Проверка содержимого кеша
-          echo "=== platformio_cache/.platformio/lib ==="
-          ls -1 platformio_cache/.platformio/lib || true
-          echo "=== platformio_cache/.platformio/packages ==="
-          ls -1 platformio_cache/.platformio/packages || true
-
-          docker rm -f pio_tmp
-
-      # 5. Build final offline image
-      - name: Build final offline image
+      # 5️⃣ Commit container as offline image
+      - name: Commit container as offline image
         run: |
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio
-          TAG_SHA=${GITHUB_SHA::7}
+          CONTAINER=$(docker create -it -v "${{ github.workspace }}":/workspace -w /workspace esp-final:latest /bin/bash)
+          docker start -ai $CONTAINER || true
+          docker commit $CONTAINER ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+          docker push ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+          docker rm -f $CONTAINER
 
-          docker build \
-            -t $IMAGE:offline-$TAG_SHA \
-            -t $IMAGE:offline-latest \
-            -f Dockerfile.final .
-
-          docker push $IMAGE:offline-$TAG_SHA
-          docker push $IMAGE:offline-latest
-
-      # 6. Test libraries in final image (от root)
+      # 6️⃣ Test cached libraries and packages in final image
       - name: Verify cached libraries in final image
         run: |
           IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
           docker run --rm -u root -v "${{ github.workspace }}":/workspace -w /workspace $IMAGE bash -lc "
-            echo '===== Cached libraries in final image ====='
-            ls -1 \$PLATFORMIO_HOME_DIR/lib || echo '(empty)'
-            ls -1 \$PLATFORMIO_HOME_DIR/packages || echo '(empty)'
+            echo '===== Cached libraries (.platformio/lib) ====='
+            if [ -d \$PLATFORMIO_HOME_DIR/lib ]; then
+              ls -1 \$PLATFORMIO_HOME_DIR/lib
+            else
+              echo '(empty)'
+            fi
+
+            echo '===== Cached packages (.platformio/packages) ====='
+            if [ -d \$PLATFORMIO_HOME_DIR/packages ]; then
+              ls -1 \$PLATFORMIO_HOME_DIR/packages
+            else
+              echo '(empty)'
+            fi
           "
