@@ -41,20 +41,24 @@ jobs:
           echo "=== PlatformIO Lib Cache in Image ==="
           docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
 
-      - name: Debug lib folder inside container
+      - name: Diagnose PlatformIO packages & libraries
         run: |
           docker run --rm \
-            -v "${{ github.workspace }}":/workspace \
+            -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
-            bash -lc "
-              echo '--- lib listing ---'
-              ls -la lib || true
-              find lib -maxdepth 3 -type f -print || true
-              echo '--- OneWire properties ---'
-              test -f lib/OneWire/library.properties && sed -n '1,200p' lib/OneWire/library.properties || echo 'no library.properties'
-              echo '--- pio lib list ---'
-              pio lib list || true
+            $IMAGE \
+            bash -lc 'echo "=== PlatformIO Packages in Image ==="
+                       ls -1 /root/.platformio/packages || true
+                       echo "=== PlatformIO Platforms in Image ==="
+                       ls -1 /root/.platformio/platforms || true
+                       echo "=== PlatformIO Lib Cache in Image ==="
+                       ls -1 /root/.platformio/lib || true
+                       echo "=== Local lib folder ==="
+                       ls -R lib || true
+                       echo "=== PIO lib list ==="
+                       pio lib list'
+
+
 
       # -----------------------------
       # Сборка прошивки полностью offline
