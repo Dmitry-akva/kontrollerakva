@@ -3,7 +3,6 @@ name: Build Firmware Offline
 on:
   workflow_dispatch:
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
