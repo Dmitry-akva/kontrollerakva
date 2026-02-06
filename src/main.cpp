@@ -4,7 +4,7 @@
 #include "ArduinoOTA.h"
 #include "ESP8266HTTPClient.h"
 #include "ESP8266httpUpdate.h"
-#include "OneWire.h"
+
 #include "DallasTemperature.h"
 #include "EEPROM.h"
 #include "FastBot.h"
