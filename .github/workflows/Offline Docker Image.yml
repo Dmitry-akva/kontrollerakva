@@ -1,26 +1,61 @@
-name: Build PlatformIO Offline Image
+name: Build Firmware and Cache (root)
 
 on:
   workflow_dispatch:
 
-
 jobs:
-  build-image:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build and push Docker image
+      - name: Pull existing PlatformIO image
         run: |
-          IMAGE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):offline-cache
-          echo "Building $IMAGE"
-          docker build -t $IMAGE .
-          docker push $IMAGE
+          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          docker pull $IMAGE_BASE || true
+
+      - name: Build firmware inside container (root)
+        run: |
+          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          docker run --rm \
+            -u root \
+            -e PLATFORMIO_CORE_DIR=/platformio \
+            -e PIO_LIB_DIR=/platformio/lib \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            $IMAGE_BASE \
+            bash -c "pio run || true"
+
+      - name: Commit new image with firmware + cache
+        run: |
+          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
+          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
+          docker build --build-arg BASE_IMAGE=$IMAGE_BASE -t $IMAGE_NEW - <<EOF
+FROM \$BASE_IMAGE
+WORKDIR /workspace
+CMD ["bash"]
+EOF
+          docker push $IMAGE_NEW
+
+      - name: Diagnose PlatformIO cache inside new image
+        run: |
+          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
+          docker run --rm \
+            -u root \
+            -e PLATFORMIO_CORE_DIR=/platformio \
+            -e PIO_LIB_DIR=/platformio/lib \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            $IMAGE_NEW \
+            bash -c "
+              echo '=== PlatformIO cache directories ==='
+              ls -la /platformio
+              ls -la /platformio/lib || echo '/platformio/lib missing'
+              echo
+              echo '=== Check offline build ==='
+              pio run --offline || echo 'Offline build failed'"
