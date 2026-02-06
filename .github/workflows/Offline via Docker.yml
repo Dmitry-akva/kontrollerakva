@@ -1,0 +1,38 @@
+name: Build ESP8266 Firmware (Offline via Docker)
+
+on:
+  push:
+    paths:
+      - 'src/**'
+      - 'platformio.ini'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Login to GHCR
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: 📦 Pull offline PlatformIO image
+        run: docker pull ghcr.io/${{ github.repository }}:latest
+
+      - name: 🛠 Build firmware using offline container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/${{ github.repository }}:latest \
+            pio run --offline
+
+      - name: 📤 Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            .pio/build/*/*.bin
+            .pio/build/*/*.elf
