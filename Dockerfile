@@ -24,15 +24,24 @@ RUN pio pkg install --global \
     --tool tool-mkspiffs
 
 # -------- Создаём рабочие папки --------
-RUN mkdir -p /workspace /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
+RUN mkdir -p /workspace /root/.platformio/lib /root/.platformio/lib_cache
 
 WORKDIR /workspace
 
-# -------- Копируем локальные библиотеки сразу в кеш PlatformIO --------
-COPY lib/ /root/.platformio/lib/
+# -------- Копируем локальные библиотеки --------
+COPY lib/ /workspace/lib/
 
-# -------- Тестовая сборка для кеша всех библиотек --------
-# Создаём временный минимальный проект, чтобы PIO проиндексировал lib/
+# -------- Инсталируем библиотеки в PIO lib cache --------
+# Перечисляем все библиотеки, чтобы PIO установил их и больше не тянул из интернета
+RUN pio lib install /workspace/lib/DallasTemperature \
+ && pio lib install /workspace/lib/FastBot \
+ && pio lib install /workspace/lib/FileData \
+ && pio lib install /workspace/lib/GTimer \
+ && pio lib install /workspace/lib/GyverHC595 \
+ && pio lib install /workspace/lib/GyverPortal \
+ && pio lib install /workspace/lib/OneWire
+
+# -------- Тестовая "пустая" сборка, чтобы проиндексировать кеш --------
 RUN echo "[env:nodemcuv2]\nplatform=espressif8266\nboard=nodemcuv2\nframework=arduino" > platformio.ini \
  && mkdir src \
  && echo "void setup(){} void loop(){}" > src/main.cpp \
