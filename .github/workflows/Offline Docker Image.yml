@@ -1,7 +1,7 @@
 name: Build ESP8266 Offline Docker Image
 
 on:
-   workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   build-image:
@@ -25,19 +25,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: 🏷 Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest
-            type=sha
-
-      - name: 🧱 Build and push Docker image
+      - name: 🏷 Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ghcr.io/${{ github.repository }}:latest
