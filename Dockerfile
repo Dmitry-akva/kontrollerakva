@@ -1,58 +1,67 @@
-# Dockerfile - offline PlatformIO image with local libs installed into PIO cache
-FROM python:3.11-slim
+# ------------------------------
+# Stage 1: builder (сборка кеша)
+# ------------------------------
+FROM python:3.11-slim AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive \
-    PLATFORMIO_CORE_DIR=/root/.platformio \
-    PATH="/root/.local/bin:${PATH}"
-
+# Системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates curl unzip build-essential \
+    git build-essential libffi-dev libssl-dev python3-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install platformio
+# Установка PlatformIO
 RUN pip install --no-cache-dir platformio
 
-# Preinstall platform/toolchain for esp8266
-RUN pio pkg install --global \
-    --platform espressif8266 \
-    --tool toolchain-xtensa \
-    --tool tool-esptool \
-    --tool tool-mkspiffs || true
+# Создание non-root пользователя
+RUN useradd -m -s /bin/bash pio
+USER pio
+WORKDIR /home/pio
 
-# create dirs
-RUN mkdir -p /workspace /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
+# Папки для кешей PlatformIO
+RUN mkdir -p /home/pio/.platformio/lib \
+             /home/pio/.platformio/packages \
+             /home/pio/.platformio/platforms
 
+ENV PLATFORMIO_HOME_DIR=/home/pio/.platformio
+
+# Копируем проект в контейнер
 WORKDIR /workspace
+COPY . /workspace
 
-# Copy project libs into image (source form)
-COPY lib/ /tmp/lib/
+# Устанавливаем локальные библиотеки и делаем сборку для кеша
+RUN set -euo pipefail && \
+    for lib in /workspace/lib/*; do \
+        [ -d "$lib" ] || continue; \
+        echo "Installing library: $lib"; \
+        pio lib install "$lib"; \
+    done && \
+    echo "Running full build to populate cache..." && \
+    pio run -v -j 4
 
-# Ensure each library has library.properties/library.json (create minimal if missing),
-# then copy each lib into PIO lib cache (/root/.platformio/lib/<LibName>)
-RUN set -eux; \
-    for d in /tmp/lib/*; do \
-      [ -d "$d" ] || continue; \
-      name="$(basename "$d")"; \
-      # if no library.properties or library.json - create minimal library.properties
-      if [ ! -f "$d/library.properties" ] && [ ! -f "$d/library.json" ]; then \
-        echo "name = $name" > "$d/library.properties"; \
-        echo "version = 0.0.0" >> "$d/library.properties"; \
-        echo "Automatically created minimal library.properties for $name"; \
-      fi; \
-      # copy to PIO lib cache folder (use name to avoid nested paths)
-      rm -rf "/root/.platformio/lib/$name" || true; \
-      cp -r "$d" "/root/.platformio/lib/$name"; \
-    done
+# ------------------------------
+# Stage 2: final image (оффлайн)
+# ------------------------------
+FROM python:3.11-slim
 
-# Do a temporary tiny build to let PlatformIO index libs (no network)
-RUN echo "[env:nodemcuv2]\nplatform=espressif8266\nboard=nodemcuv2\nframework=arduino" > platformio.ini \
- && mkdir -p src \
- && echo "void setup(){} void loop(){}" > src/main.cpp \
- && pio run -e nodemcuv2 -v -j 4 || true \
- && rm -rf src platformio.ini .pio
+# Системные зависимости минимально
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Optional: list cached libs for debug
-RUN echo "=== cached libs ===" && ls -1 /root/.platformio/lib || true
+# Установка PlatformIO
+RUN pip install --no-cache-dir platformio
 
+# Создание non-root пользователя
+RUN useradd -m -s /bin/bash pio
+USER pio
+WORKDIR /home/pio
+
+ENV PLATFORMIO_HOME_DIR=/home/pio/.platformio
+
+# Копируем кеши из builder
+COPY --from=builder /home/pio/.platformio /home/pio/.platformio
+
+# Копируем проект (опционально)
 WORKDIR /workspace
-CMD ["tail","-f","/dev/null"]
+COPY --from=builder /workspace /workspace
+
+CMD ["bash"]
