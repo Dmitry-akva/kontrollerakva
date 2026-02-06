@@ -38,46 +38,30 @@ jobs:
       - name: Populate PlatformIO cache in container
         run: |
           set -euo pipefail
-
-          # старт контейнера из base image
-          docker run --name pio_tmp -v "${{ github.workspace }}":/workspace -w /workspace -d esp-base:latest tail -f /dev/null
-
-          # установка локальных библиотек и прогон сборки для кеша
-          docker exec pio_tmp bash -lc "set -euo pipefail; \
-            mkdir -p /home/pio/.platformio; \
-            echo 'Installing local libraries...' | tee /workspace/pio_cache_build.log; \
-            for lib in /workspace/lib/*; do \
-              [ -d \"\$lib\" ] || continue; \
-              echo \"Installing library: \$lib\" | tee -a /workspace/pio_cache_build.log; \
-              pio lib install \"\$lib\" 2>&1 | tee -a /workspace/pio_cache_build.log; \
-            done; \
-            echo 'Running full build to populate cache...' | tee -a /workspace/pio_cache_build.log; \
-            pio run -v -j 4 2>&1 | tee -a /workspace/pio_cache_build.log; \
+      
+          # Старт контейнера из base-образа
+          docker run --name pio_tmp \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace \
+            -d esp-base:latest tail -f /dev/null
+      
+          # Установка локальных библиотек и прогрев кеша сборкой
+          docker exec pio_tmp bash -lc "
+            set -euo pipefail
+            echo 'Installing local libraries...'
+            for lib in /workspace/lib/*; do
+              [ -d \"\$lib\" ] || continue
+              echo \"Installing library: \$lib\"
+              pio lib install \"\$lib\"
+            done
+      
+            echo 'Running full build to populate cache...'
+            pio run -v -j 4
           "
-
-          # копирование подготовленного кеша на хост
+      
+          # Копируем готовый кеш PlatformIO на хост
           rm -rf platformio_cache || true
           docker cp pio_tmp:/home/pio/.platformio ./platformio_cache
-
-          # удаление временного контейнера
+      
+          # Удаляем временный контейнер
           docker rm -f pio_tmp
-
-      # -----------------------------
-      # 5. Upload build log
-      # -----------------------------
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: pio-cache-build-log
-          path: pio_cache_build.log
-
-      # -----------------------------
-      # 6. Build final offline image
-      # -----------------------------
-      - name: Build final offline image
-        run: |
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio
-          TAG_SHA=${GITHUB_SHA::7}
-          docker build -t $IMAGE:offline-$TAG_SHA -t $IMAGE:offline-latest -f Dockerfile.final .
-          docker push $IMAGE:offline-$TAG_SHA
-          docker push $IMAGE:offline-latest
