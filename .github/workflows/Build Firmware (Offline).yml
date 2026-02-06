@@ -1,65 +1,37 @@
-name: Build Firmware Fully Offline (with Cache Check)
+name: Build Firmware Fully Offline (with cache check)
 
 on:
   workflow_dispatch:
 
 jobs:
-  offline-build:
+  offline-build-with-cache-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
-      # -----------------------------
-      # 1️⃣ Checkout repository
-      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2️⃣ Log in to GHCR (если образ приватный)
-      # -----------------------------
-      - name: Log in to GHCR
+      - name: Log in to GHCR (if image is private)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # -----------------------------
-      # 3️⃣ List cached libs and packages in image
-      # -----------------------------
-      - name: Check cached PlatformIO contents
+      - name: Build firmware and check caches inside offline image
         run: |
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-          docker run --rm \
-            -u root \
-            -v "${{ github.workspace }}":/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc "
-              set -euo pipefail
-              echo '===== PLATFORMIO HOME DIR ====='
-              echo \$PLATFORMIO_HOME_DIR
-              echo
-              echo '===== Cached libraries (.platformio/lib) ====='
-              [ -d \$PLATFORMIO_HOME_DIR/lib ] && ls -1 \$PLATFORMIO_HOME_DIR/lib || echo '(empty)'
-              echo
-              echo '===== Cached packages (.platformio/packages) ====='
-              [ -d \$PLATFORMIO_HOME_DIR/packages ] && ls -1 \$PLATFORMIO_HOME_DIR/packages || echo '(empty)'
-              echo
-              echo '===== Local project lib/ ====='
-              [ -d lib ] && ls -1 lib || echo '(empty)'
-              echo
-              echo '===== Tree of first-level cache ====='
-              [ -d \$PLATFORMIO_HOME_DIR ] && ls -1 \$PLATFORMIO_HOME_DIR || echo '(empty)'
-            "
+          set -euo pipefail
 
-      # -----------------------------
-      # 4️⃣ Build firmware offline
-      # -----------------------------
-      - name: Build firmware offline
-        run: |
           IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+          LOG=/workspace/pio_build.log
+          CACHE_LIST=/workspace/cache_list.txt
+
+          echo "IMAGE=$IMAGE" > $LOG
+          echo "Start time: $(date --iso-8601=seconds)" >> $LOG
+          echo >> $LOG
+
+          # Run container, install local libs into cache, run full build and record output to workspace (so artifacts can be uploaded)
           docker run --rm \
             -u root \
             -v "${{ github.workspace }}":/workspace \
@@ -67,21 +39,78 @@ jobs:
             $IMAGE \
             bash -lc "
               set -euo pipefail
-              echo '===== Installing local libraries into cache ====='
+
+              echo '===== PLATFORMIO_HOME_DIR ====='
+              echo \${PLATFORMIO_HOME_DIR:-/root/.platformio}
+              echo
+
+              echo '===== Installing local libraries into cache (if any) ====='
               for lib in lib/*; do
                 [ -d \"\$lib\" ] || continue
                 echo \"Installing library: \$lib\"
-                pio pkg install --library \$lib
+                pio pkg install --library \"\$lib\" 2>&1 || echo 'pkg install returned non-zero' 
               done
+
+              echo
               echo '===== Running full firmware build ====='
               pio run -v -j 4
-            "
+            " 2>&1 | tee -a $LOG
 
-      # -----------------------------
-      # 5️⃣ Upload firmware binaries
-      # -----------------------------
-      - name: Upload firmware binaries
+          echo >> $LOG
+          echo "Build finished: $(date --iso-8601=seconds)" >> $LOG
+
+          # Now inspect cache contents from the image (run a container briefly to list caches)
+          echo "===== CACHE INSPECTION =====" > $CACHE_LIST
+          docker run --rm \
+            -u root \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace \
+            $IMAGE \
+            bash -lc "
+              set -euo pipefail
+              echo 'PLATFORMIO_HOME_DIR=' \${PLATFORMIO_HOME_DIR:-/root/.platformio}
+              echo
+              echo '--- lib (cached local libs) ---'
+              if [ -d \${PLATFORMIO_HOME_DIR:-/root/.platformio}/lib ]; then
+                ls -1 \${PLATFORMIO_HOME_DIR:-/root/.platformio}/lib || true
+              else
+                echo '(no .platformio/lib directory)'
+              fi
+              echo
+              echo '--- packages (frameworks/toolchain) ---'
+              if [ -d \${PLATFORMIO_HOME_DIR:-/root/.platformio}/packages ]; then
+                ls -1 \${PLATFORMIO_HOME_DIR:-/root/.platformio}/packages || true
+              else
+                echo '(no .platformio/packages directory)'
+              fi
+              echo
+              echo '--- check OneWire presence in lib ---'
+              if [ -d \${PLATFORMIO_HOME_DIR:-/root/.platformio}/lib/OneWire ] || [ -d lib/OneWire ]; then
+                echo 'OneWire: FOUND'
+              else
+                echo 'OneWire: NOT FOUND'
+              fi
+            " >> $CACHE_LIST 2>&1
+
+          # show quick summary in job log
+          echo "=== quick summary ==="
+          tail -n +1 $CACHE_LIST | sed -n '1,200p'
+          echo "Logs saved to $LOG and $CACHE_LIST (will be uploaded as artifacts)"
+          echo
+
+      - name: Upload build log
         uses: actions/upload-artifact@v3
         with:
-          name: firmware-binaries
-          path: .pio/build/nodemcuv2/*.bin
+          name: pio-build-log
+          path: pio_build.log
+
+      - name: Upload cache listing
+        uses: actions/upload-artifact@v3
+        with:
+          name: platformio-cache-list
+          path: cache_list.txt
+
+      - name: Show location of firmware binary (if built)
+        run: |
+          echo "Artifacts (binaries) if created:"
+          ls -lh .pio/build/**/*.bin || echo "(no binaries found)"
