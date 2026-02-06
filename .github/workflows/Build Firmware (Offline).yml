@@ -45,18 +45,15 @@ jobs:
       # Сборка прошивки полностью offline
       # -----------------------------
       - name: Build firmware fully offline
-        env:
-          IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
+          # Выводим лог прямо в рабочую папку на GitHub runner
           docker run --rm \
-            --network none \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
-            bash -lc "pio run -v -j $JOBS 2>&1" | tee build-log.txt
-
+            bash -lc "pio run -v -j $JOBS" | tee build-log.txt
 
 
 
