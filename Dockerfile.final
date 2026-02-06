@@ -1,28 +1,24 @@
-# Dockerfile.final
 FROM python:3.11-slim
 
 # Системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl \
+    git build-essential libffi-dev libssl-dev python3-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Установка PlatformIO
 RUN pip install --no-cache-dir platformio
 
-# Non-root пользователь
+# Создаём пользователя
 RUN useradd -m -s /bin/bash pio
-USER pio
-WORKDIR /home/pio
 
-ENV PLATFORMIO_HOME_DIR=/home/pio/.platformio
-
-# Копируем заранее подготовленный cache (workflow создаёт ./platformio_cache)
+# Копируем прогретый кеш PlatformIO
 COPY platformio_cache /home/pio/.platformio
 
-# Опционно: чистим лишние временные файлы внутри кеша, если нужно
-# RUN rm -rf /home/pio/.platformio/.cache/* || true
+# ❗ КРИТИЧЕСКИЙ ШАГ — исправляем владельца кеша
+RUN chown -R pio:pio /home/pio/.platformio
 
-WORKDIR /workspace
+# Переключаемся на пользователя pio
 USER pio
+WORKDIR /workspace
 
-CMD ["bash"]
+ENV PLATFORMIO_HOME_DIR=/home/pio/.platformio
