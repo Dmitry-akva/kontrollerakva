@@ -25,23 +25,28 @@ jobs:
           password: ${{ secrets.GHCR_PAT }}
 
       # -----------------------------
-      # 3. Run firmware build in offline Docker container
+      # 3. Build firmware inside offline container
       # -----------------------------
       - name: Build firmware in container
         run: |
           docker run --rm \
+            -u root \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
-            bash -c "set -euo pipefail; \
-                     echo 'Installing local libraries...'; \
-                     for lib in /workspace/lib/*; do \
-                       [ -d \"\$lib\" ] || continue; \
-                       echo Installing \$lib; \
-                       pio lib install \$lib; \
-                     done; \
-                     echo 'Running firmware build...'; \
-                     pio run -v -j 4"
+            bash -lc "
+              set -euo pipefail
+
+              echo 'Installing local libraries...'
+              for lib in /workspace/lib/*; do
+                [ -d \"\$lib\" ] || continue
+                echo Installing \$lib
+                pio pkg install --library \"\$lib\"
+              done
+
+              echo 'Running firmware build...'
+              pio run -v -j 4
+            "
 
       # -----------------------------
       # 4. Upload firmware binaries
