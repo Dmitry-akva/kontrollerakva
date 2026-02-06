@@ -1,4 +1,4 @@
-Processing nodemcuv2 (platform: espressif8266; board: nodemcuv2; framework: arduino; monitor_speed: 115200; build_flags: -D LED_BUILTIN=2)
---------------------------------------------------------------------------------
-Library Manager: Installing paulstoffregen/OneWire @ ^2.3.5
-HTTPClientError: 
+Usage: pio run [OPTIONS]
+Try 'pio run -h' for help.
+
+Error: Invalid value for '-d' / '--project-dir': Path '/workspace' is not writable.
