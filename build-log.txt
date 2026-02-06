@@ -1,3 +1,4 @@
-1234235235
-цукцукцукфыва
-ячсмчсм
+Processing nodemcuv2 (platform: espressif8266; board: nodemcuv2; framework: arduino; monitor_speed: 115200; build_flags: -D LED_BUILTIN=2)
+--------------------------------------------------------------------------------
+Library Manager: Installing paulstoffregen/OneWire @ ^2.3.5
+HTTPClientError: 
