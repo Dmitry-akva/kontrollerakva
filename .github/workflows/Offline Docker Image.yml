@@ -1,9 +1,7 @@
 name: Build ESP8266 Offline Docker Image
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+ workflow_dispatch:
 
 jobs:
   build:
