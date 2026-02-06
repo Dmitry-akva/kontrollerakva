@@ -1,4 +1,4 @@
-name: Check PlatformIO Library Cache
+name: Check PlatformIO Library Cache (use existing GHCR image)
 
 on:
   workflow_dispatch:
@@ -8,31 +8,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------------
-      # 1. Checkout repository
-      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2. Run container and list PlatformIO cache
-      # -----------------------------
-      - name: List cached PlatformIO libraries
+      # --------- логин в GHCR (обязательно если образ приватный) ----------
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}   # секрет должен содержать токен с read:packages
+
+      - name: Pull GHCR image (explicit)
         run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+          echo "Trying to pull $IMAGE"
+          docker pull $IMAGE
+          docker images | grep esp8266-platformio || true
+
+      - name: List cached PlatformIO libraries from the image
+        run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            ghcr.io/dmitry-akva/esp8266-platformio:offline-latest \
+            $IMAGE \
             bash -lc "
-              echo '===== PlatformIO Home Dir ====='
-              echo \$PLATFORMIO_HOME_DIR
+              echo 'PLATFORMIO_HOME_DIR=' \$PLATFORMIO_HOME_DIR || true
+              echo '===== Cached libraries in image ====='
+              ls -1 /home/pio/.platformio/lib || echo '(no cache dir or not found)'
               echo
-              echo '===== Cached Libraries ====='
-              ls -1 \$PLATFORMIO_HOME_DIR/lib
+              echo '===== Local project lib/ ====='
+              ls -1 lib || echo '(no project lib dir)'
               echo
-              echo '===== Project Local Libraries ====='
-              ls -1 lib
-              echo
-              echo '===== Full Library Cache Tree ====='
-              tree \$PLATFORMIO_HOME_DIR/lib || true
+              echo '===== Tree of cache (first-level) ====='
+              for d in /home/pio/.platformio/lib/*; do [ -d \"\$d\" ] && echo \"- \$d\"; done || true
             "
