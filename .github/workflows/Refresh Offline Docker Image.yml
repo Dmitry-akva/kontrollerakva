@@ -93,3 +93,23 @@ jobs:
 
           docker push $IMAGE:offline-$TAG_SHA
           docker push $IMAGE:offline-latest
+
+       # -----------------------------
+      # 6. Check cached libraries inside final image
+      # -----------------------------
+      - name: Verify cached libraries in final image
+        run: |
+          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+          echo "===== Checking cached libraries inside $IMAGE ====="
+          docker run --rm -u pio -v "${{ github.workspace }}":/workspace -w /workspace $IMAGE bash -lc "
+            echo 'PLATFORMIO_HOME_DIR=' \$PLATFORMIO_HOME_DIR
+            echo
+            echo '===== Cached libraries ====='
+            if [ -d \$PLATFORMIO_HOME_DIR/lib ]; then
+              ls -1 \$PLATFORMIO_HOME_DIR/lib
+            else
+              echo '(no cached libraries found)'
+            fi
+          "
+
