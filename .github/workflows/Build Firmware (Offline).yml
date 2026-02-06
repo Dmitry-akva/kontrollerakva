@@ -1,4 +1,4 @@
-name: Build Firmware (Fully Offline)
+name: Build Firmware Fully Offline
 
 on:
   workflow_dispatch:
@@ -10,9 +10,15 @@ jobs:
       IMAGE: ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
     steps:
+      # -----------------------------
+      # 1. Checkout
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # 2. Log in to GHCR (для образа)
+      # -----------------------------
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -20,9 +26,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      - name: Pull offline Docker image (if not present)
+      # -----------------------------
+      # 3. Pull offline image
+      # -----------------------------
+      - name: Pull offline Docker image
         run: docker pull $IMAGE || true
 
+      # -----------------------------
+      # 4. Определяем количество параллельных задач
+      # -----------------------------
       - name: Determine number of build jobs
         id: set_jobs
         run: |
@@ -30,53 +42,44 @@ jobs:
           echo "jobs=$JOBS" >> $GITHUB_OUTPUT
 
       # -----------------------------
-      # Диагностика offline-образа
+      # 5. Диагностика образа (опционально)
       # -----------------------------
-      - name: Check installed PlatformIO packages
+      - name: Diagnose PlatformIO image
         run: |
-          echo "=== PlatformIO Packages in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/packages || true"
-          echo "=== PlatformIO Platforms in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/platforms || true"
-          echo "=== PlatformIO Lib Cache in Image ==="
-          docker run --rm $IMAGE bash -lc "ls -1 /root/.platformio/lib || true"
-
-      - name: Diagnose PlatformIO packages & libraries
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc 'echo "=== PlatformIO Packages in Image ==="
-                       ls -1 /root/.platformio/packages || true
-                       echo "=== PlatformIO Platforms in Image ==="
-                       ls -1 /root/.platformio/platforms || true
-                       echo "=== PlatformIO Lib Cache in Image ==="
-                       ls -1 /root/.platformio/lib || true
-                       echo "=== Local lib folder ==="
-                       ls -R lib || true
-                       echo "=== PIO lib list ==="
-                       pio lib list'
-
-
+          docker run --rm $IMAGE bash -lc '
+            echo "=== PlatformIO Packages ==="
+            ls -1 /root/.platformio/packages || true
+            echo "=== PlatformIO Platforms ==="
+            ls -1 /root/.platformio/platforms || true
+            echo "=== PlatformIO Lib Cache ==="
+            ls -1 /root/.platformio/lib || true
+          '
 
       # -----------------------------
-      # Сборка прошивки полностью offline
+      # 6. Сборка прошивки полностью offline
       # -----------------------------
       - name: Build firmware fully offline
         run: |
           JOBS=${{ steps.set_jobs.outputs.jobs }}
           echo "Running PlatformIO fully offline with -j $JOBS"
-          # Выводим лог прямо в рабочую папку на GitHub runner
           docker run --rm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             $IMAGE \
             bash -lc "pio run -v -j $JOBS" | tee build-log.txt
 
+      # -----------------------------
+      # 7. Сохраняем лог сборки
+      # -----------------------------
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build-log.txt
 
-
-
+      # -----------------------------
+      # 8. Сохраняем бинарники прошивки
+      # -----------------------------
       - name: Upload firmware binary(s)
         uses: actions/upload-artifact@v4
         with:
