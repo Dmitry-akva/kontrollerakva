@@ -12,39 +12,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --- Log in to GHCR ---
-      - name: Log in to GitHub Container Registry
+      # --- Log in to GitHub Container Registry ---
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_PAT }}
 
-      # --- Build base offline image from Dockerfile ---
+      # --- Build initial offline image ---
       - name: Build base offline image
         run: |
           docker build --pull -t ghcr.io/dmitry-akva/esp8266-platformio:offline-latest .
-      # --- Start container with mounted workspace ---
+
+      # --- Start container для кеша ---
       - name: Start container for caching
         run: |
           docker run --name pio_cache_builder \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             -d ghcr.io/dmitry-akva/esp8266-platformio:offline-latest tail -f /dev/null
-      # --- Prepare PlatformIO caches inside container ---
-      - name: Initialize PlatformIO caches
+
+      # --- Создание папок кеша внутри контейнера ---
+      - name: Initialize PlatformIO cache
         run: |
           docker exec pio_cache_builder bash -lc "
             mkdir -p /root/.platformio/lib /root/.platformio/packages /workspace/.pio/build
           "
-      # --- Run full offline build to populate caches ---
-      - name: Full offline build to populate cache
+
+      # --- Копируем библиотеки в образ и запускаем сборку для кеша ---
+      - name: Populate PlatformIO cache with local libs
         run: |
           docker exec pio_cache_builder bash -lc "
-            echo 'Running test build with all libraries from lib/ folder...'
+            # Копируем lib/ из репозитория в кеш PIO
+            cp -r /workspace/lib/* /root/.platformio/lib/
+            echo 'Building firmware to populate cache...'
             pio run -v -j 4
           "
-      # --- Commit container with fully cached PlatformIO ---
+
+      # --- Commit container as new offline image ---
       - name: Commit container as new offline image
         run: docker commit pio_cache_builder ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
 
