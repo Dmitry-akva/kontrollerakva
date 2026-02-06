@@ -1,101 +1,63 @@
-name: Build Firmware Fully Offline (Root, Cache Check)
+name: Build Firmware Offline
 
 on:
   workflow_dispatch:
 
 jobs:
-  offline-build:
+  build-offline-firmware:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
 
     steps:
-      - name: Checkout repository
+      # -----------------------------
+      # 1. Checkout repository
+      # -----------------------------
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Log in to GHCR (if private)
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
-
-      - name: Build firmware and inspect cache
+      # -----------------------------
+      # 2. Build final offline image
+      # -----------------------------
+      - name: Build Docker image
         run: |
-          set -euo pipefail
+          docker build -t esp-final:latest -f Dockerfile.final .
 
-          IMAGE=ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
-          LOG=/workspace/pio_build.log
-          CACHE_LIST=/workspace/cache_list.txt
-
-          # Создаём файлы, чтобы tee мог писать
-          mkdir -p /workspace
-          touch $LOG $CACHE_LIST
-
-          echo "IMAGE=$IMAGE" > $LOG
-          echo "Start time: $(date --iso-8601=seconds)" >> $LOG
-          echo >> $LOG
-
-          echo "===== BUILDING FIRMWARE =====" | tee -a $LOG
-
-          # Запуск сборки полностью от root
-          docker run --rm \
-            -u root \
-            -v "${{ github.workspace }}":/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc "
-              set -euo pipefail
-
-              echo '===== Installing local libraries into cache ====='
-              for lib in lib/*; do
-                [ -d \"\$lib\" ] || continue
-                echo \"Installing library: \$lib\"
-                pio pkg install --library \"\$lib\" 2>&1 || echo 'pkg install returned non-zero'
-              done
-
-              echo '===== Running full firmware build ====='
-              pio run -v -j 4
-            " 2>&1 | tee -a $LOG
-
-          echo >> $LOG
-          echo "Build finished: $(date --iso-8601=seconds)" >> $LOG
-
-          # Проверка кеша внутри образа
-          echo "===== CACHE CHECK =====" > $CACHE_LIST
-          docker run --rm \
-            -u root \
-            -v "${{ github.workspace }}":/workspace \
-            -w /workspace \
-            $IMAGE \
-            bash -lc "
-              set -euo pipefail
-              echo '--- lib (cached local libs) ---'
-              if [ -d /root/.platformio/lib ]; then ls -1 /root/.platformio/lib || echo '(empty)'; else echo '(empty)'; fi
-              echo
-              echo '--- packages (framework/toolchain) ---'
-              if [ -d /root/.platformio/packages ]; then ls -1 /root/.platformio/packages || echo '(empty)'; else echo '(empty)'; fi
-              echo
-              echo '--- OneWire check ---'
-              if [ -d /root/.platformio/lib/OneWire ] || [ -d /workspace/lib/OneWire ]; then
-                echo 'OneWire: FOUND'
-              else
-                echo 'OneWire: NOT FOUND'
-              fi
-            " >> $CACHE_LIST 2>&1
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: pio-build-log
-          path: pio_build.log
-
-      - name: Upload cache listing
-        uses: actions/upload-artifact@v4
-        with:
-          name: platformio-cache-list
-          path: cache_list.txt
-
-      - name: Show location of firmware binary
+      # -----------------------------
+      # 3. Create container, copy project, compile
+      # -----------------------------
+      - name: Compile firmware inside container
         run: |
-          echo "Artifacts (binaries) if created:"
-          ls -lh .pio/build/**/*.bin || echo "(no binaries found)"
+          # Создаём контейнер
+          CONTAINER=$(docker create -it esp-final:latest /bin/bash)
+          
+          # Копируем весь репозиторий внутрь контейнера
+          docker cp $GITHUB_WORKSPACE/. $CONTAINER:/workspace
+
+          # Запускаем сборку от root
+          docker start -ai $CONTAINER bash -c "
+            cd /workspace
+            echo '===== Installing local libraries ====='
+            for lib in lib/*; do
+              [ -d \"\$lib\" ] || continue
+              pio pkg install --library \"\$lib\"
+            done
+            echo '===== Running full build ====='
+            pio run -v
+          "
+
+          # Сохраняем состояние контейнера в образ
+          docker commit $CONTAINER ghcr.io/dmitry-akva/esp8266-platformio:offline-latest
+
+          # Удаляем временный контейнер
+          docker rm -f $CONTAINER
+
+      # -----------------------------
+      # 4. Проверка кешей внутри образа
+      # -----------------------------
+      - name: Check cached libraries
+        run: |
+          docker run --rm ghcr.io/dmitry-akva/esp8266-platformio:offline-latest bash -lc "
+            echo '===== Cached packages ====='
+            ls -1 /root/.platformio/packages
+            echo '===== Cached libs ====='
+            ls -1 /root/.platformio/lib || echo '(empty)'
+          "
