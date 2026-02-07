@@ -1,12 +1,100 @@
-. Variables and constants in RAM (global, static), used 32352 / 80192 bytes (40%)
-║   SEGMENT  BYTES    DESCRIPTION
-╠══ DATA     1520     initialized variables
-╠══ RODATA   3312     constants       
-╚══ BSS      27520    zeroed variables
-. Instruction RAM (IRAM_ATTR, ICACHE_RAM_ATTR), used 61279 / 65536 bytes (93%)
-║   SEGMENT  BYTES    DESCRIPTION
-╠══ ICACHE   32768    reserved space for flash instruction cache
-╚══ IRAM     28511    code in IRAM    
-. Code in flash (default, ICACHE_FLASH_ATTR), used 512072 / 1048576 bytes (48%)
-║   SEGMENT  BYTES    DESCRIPTION
-╚══ IROM     512072   code in flash   
+/work/firmware/firmware.ino:19:1: error: 'DallasTemperature' does not name a type
+   19 | DallasTemperature sensors(&oneWire); // Подключаем бибилотеку DallasTemperature
+      | ^~~~~~~~~~~~~~~~~
+/work/firmware/firmware.ino:20:1: error: 'DeviceAddress' does not name a type
+   20 | DeviceAddress temperatureSensors[3]; // размер массива определяем исходя из количества установленных датчиков
+      | ^~~~~~~~~~~~~
+/work/firmware/firmware.ino:274:6: error: variable or field 'printAddress' declared void
+  274 | void printAddress(DeviceAddress deviceAddress) {
+      |      ^~~~~~~~~~~~
+/work/firmware/firmware.ino:274:19: error: 'DeviceAddress' was not declared in this scope
+  274 | void printAddress(DeviceAddress deviceAddress) {
+      |                   ^~~~~~~~~~~~~
+/work/firmware/firmware.ino:59:1: error: 'FileData' does not name a type
+   59 | FileData data(&LittleFS, "/datazim.dat", 'B', &mydata, sizeof(mydata));
+      | ^~~~~~~~
+/work/firmware/firmware.ino: In function 'void setup()':
+/work/firmware/firmware.ino:90:3: error: 'sensors' was not declared in this scope
+   90 |   sensors.begin(); // Иницилизируем датчики
+      |   ^~~~~~~
+/work/firmware/firmware.ino:93:27: error: 'temperatureSensors' was not declared in this scope
+   93 |   {    sensors.getAddress(temperatureSensors[index], index);  }
+      |                           ^~~~~~~~~~~~~~~~~~
+/work/firmware/firmware.ino:133:4: error: 'FDstat_t' was not declared in this scope; did you mean 'mbstate_t'?
+  133 |    FDstat_t stat = data.read();   // прочитать данные из файла в переменную
+      |    ^~~~~~~~
+      |    mbstate_t
+/work/firmware/firmware.ino:134:11: error: 'stat' was not declared in this scope
+  134 |   switch (stat) {
+      |           ^~~~
+/work/firmware/firmware.ino:135:10: error: 'FD_FS_ERR' was not declared in this scope
+  135 |     case FD_FS_ERR: Serial.println("FS Error");
+      |          ^~~~~~~~~
+/work/firmware/firmware.ino:137:10: error: 'FD_FILE_ERR' was not declared in this scope
+  137 |     case FD_FILE_ERR: Serial.println("Error");
+      |          ^~~~~~~~~~~
+/work/firmware/firmware.ino:139:10: error: 'FD_WRITE' was not declared in this scope
+  139 |     case FD_WRITE: Serial.println("Data Write");
+      |          ^~~~~~~~
+/work/firmware/firmware.ino:141:10: error: 'FD_ADD' was not declared in this scope
+  141 |     case FD_ADD: Serial.println("Data Add");
+      |          ^~~~~~
+/work/firmware/firmware.ino:143:10: error: 'FD_READ' was not declared in this scope
+  143 |     case FD_READ: Serial.println("Data Read");
+      |          ^~~~~~~
+/work/firmware/firmware.ino: In function 'void newMsg(FB_msg&)':
+/work/firmware/firmware.ino:251:5: error: 'sensors' was not declared in this scope
+  251 |     sensors.requestTemperatures();
+      |     ^~~~~~~
+/work/firmware/firmware.ino:253:48: error: 'temperatureSensors' was not declared in this scope
+  253 |     {  bot.sendMessage(String(sensors.getTempC(temperatureSensors[i]), 2) + "°C");
+      |                                                ^~~~~~~~~~~~~~~~~~
+/work/firmware/firmware.ino: At global scope:
+/work/firmware/firmware.ino:274:6: error: variable or field 'printAddress' declared void
+  274 | void printAddress(DeviceAddress deviceAddress) {
+      |      ^~~~~~~~~~~~
+/work/firmware/firmware.ino:274:19: error: 'DeviceAddress' was not declared in this scope
+  274 | void printAddress(DeviceAddress deviceAddress) {
+      |                   ^~~~~~~~~~~~~
+/work/firmware/firmware.ino: In function 'void action()':
+/work/firmware/firmware.ino:538:7: error: 'data' was not declared in this scope; did you mean 'std::data'?
+  538 |       data.updateNow();
+      |       ^~~~
+      |       std::data
+In file included from /arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/array:41,
+                 from /arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/tuple:39,
+                 from /arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/functional:54,
+                 from /arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/pstl/glue_algorithm_defs.h:13,
+                 from /arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/algorithm:74,
+                 from /arduino/data/packages/esp8266/hardware/esp8266/3.1.2/cores/esp8266/Arduino.h:229,
+                 from /root/.cache/arduino/sketches/68AC2E08F52EBF000B0AB4C46E163E40/sketch/firmware.ino.cpp:1:
+/arduino/data/packages/esp8266/tools/xtensa-lx106-elf-gcc/3.1.0-gcc10.3-e5f9fec/xtensa-lx106-elf/include/c++/10.3.0/bits/range_access.h:319:5: note: 'std::data' declared here
+  319 |     data(initializer_list<_Tp> __il) noexcept
+      |     ^~~~
+/work/firmware/firmware.ino:549:32: error: 'sensors' was not declared in this scope
+  549 |     if (ui.update("plot1")) {  sensors.requestTemperatures();  ui.answer(sensors.getTempC(temperatureSensors[0]), 2); }
+      |                                ^~~~~~~
+/work/firmware/firmware.ino:549:91: error: 'temperatureSensors' was not declared in this scope
+  549 |     if (ui.update("plot1")) {  sensors.requestTemperatures();  ui.answer(sensors.getTempC(temperatureSensors[0]), 2); }
+      |                                                                                           ^~~~~~~~~~~~~~~~~~
+Error during build: exit status 1
+
+[92mUsed library[0m      [92mVersion[0m [90mPath[0m
+[93mESP8266mDNS[0m       1.2     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ESP8266mDNS[0m
+[93mESP8266WiFi[0m       1.0     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ESP8266WiFi[0m
+[93mArduinoOTA[0m        1.0     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ArduinoOTA[0m
+[93mFastBot[0m           2.27.3  [90m/arduino/user/libraries/FastBot[0m
+[93mESP8266HTTPClient[0m 1.2     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ESP8266HTTPClient[0m
+[93mESP8266httpUpdate[0m 1.3     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ESP8266httpUpdate[0m
+[93mOneWire[0m           2.3.8   [90m/arduino/user/libraries/OneWire[0m
+[93mLittleFS[0m          0.1.0   [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/LittleFS[0m
+[93mGyverPortal[0m       3.6.6   [90m/arduino/user/libraries/GyverPortal[0m
+[93mDNSServer[0m         1.1.1   [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/DNSServer[0m
+[93mESP8266WebServer[0m  1.0     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/ESP8266WebServer[0m
+[93mGyverHC595[0m        1.2     [90m/arduino/user/libraries/GyverHC595[0m
+[93mSPI[0m               1.0     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/SPI[0m
+[93mEEPROM[0m            1.0     [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2/libraries/EEPROM[0m
+[93mGTimer[0m            1.1.1   [90m/arduino/user/libraries/GTimer[0m
+
+[92mUsed platform[0m   [92mVersion[0m [90mPath[0m
+[93mesp8266:esp8266[0m 3.1.2   [90m/arduino/data/packages/esp8266/hardware/esp8266/3.1.2[0m
