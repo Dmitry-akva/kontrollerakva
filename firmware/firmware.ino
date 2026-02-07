@@ -31,5 +31,5 @@ void loop() {
   float t = sensors.getTempCByIndex(0);
   server.handleClient();
   ArduinoOTA.handle();
-  delay(1000);
+  delay(10000);
 }
