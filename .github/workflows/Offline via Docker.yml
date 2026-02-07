@@ -27,6 +27,7 @@ jobs:
       - name: Compile firmware (offline, verbose)
         run: |
           docker run --rm \
+            -- network-none\
             -v ${{ github.workspace }}:/work \
             -w /work \
             ghcr.io/$REPO_LC/esp8266-offline:latest \
