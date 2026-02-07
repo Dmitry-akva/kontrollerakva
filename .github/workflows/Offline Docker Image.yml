@@ -1,22 +1,17 @@
 name: Build ESP8266 Offline Docker
-
-
+on:
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
       - name: Build image
         run: docker build -t ghcr.io/${{ github.repository }}/esp8266-offline:latest .
-
       - name: Push image
         run: docker push ghcr.io/${{ github.repository }}/esp8266-offline:latest
