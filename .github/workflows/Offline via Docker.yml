@@ -27,7 +27,7 @@ jobs:
       - name: Compile firmware (offline, verbose)
         run: |
           docker run --rm \
-            -- network-none\
+            -- network none \
             -v ${{ github.workspace }}:/work \
             -w /work \
             ghcr.io/$REPO_LC/esp8266-offline:latest \
@@ -35,11 +35,13 @@ jobs:
               --config-file /arduino-cli.yaml \
               --fqbn esp8266:esp8266:nodemcuv2 \
               --verbose \
-              --output-dir /work/build \
+              --output-dir /work/_build \
               ./firmware
+
 
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
         with:
           name: esp8266-firmware
-          path: build/*.bin
+          path: _build/*.bin
+
