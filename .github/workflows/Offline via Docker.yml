@@ -32,7 +32,7 @@ jobs:
             -w /work \
             ghcr.io/${{ env.REPO_LC }}/esp8266-offline:latest \
             bash -c '
-              FQBN="esp8266:esp8266:nodemcuv2:CpuFrequency=160,FlashSize=4M1M,Debug=Disabled"
+             
               LOG=build-log.txt
       
               echo "=== Build started ===" > $LOG
