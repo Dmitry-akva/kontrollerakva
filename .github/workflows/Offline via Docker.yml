@@ -24,10 +24,9 @@ jobs:
       - name: Pull offline ESP8266 image
         run: docker pull ghcr.io/$REPO_LC/esp8266-offline:latest
 
-      - name: Compile firmware (offline, verbose)
+      - name: Compile firmware and save clean log
         run: |
           docker run --rm \
-            --network none \
             -v ${{ github.workspace }}:/work \
             -w /work \
             ghcr.io/$REPO_LC/esp8266-offline:latest \
@@ -36,11 +35,13 @@ jobs:
               --fqbn esp8266:esp8266:nodemcuv2 \
               --verbose \
               --output-dir /work/_build \
-              ./firmware \ 
-             2>&1 | tee build-log.txt
-              # Очистка от цветов и лишнего
-            sed -n '/Variables and constants in RAM/,/Used platform/p' build-log.txt \
-              | sed 's/\x1b\[[0-9;]*m//g' > build-log-clean.txt
+              ./firmware \
+            2>&1 | tee build-log.txt
+      
+          # Очистка от цветов и лишнего
+          sed -n '/Variables and constants in RAM/,/Used platform/p' build-log.txt \
+            | sed 's/\x1b\[[0-9;]*m//g' > build-log-clean.txt
+
 
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
