@@ -1,126 +1,44 @@
-name: Build Firmware and Preheat Libraries (root, safe lib_deps)
+name: Build ESP8266 Firmware (Offline via Docker)
 
 on:
+
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: read   # нужно, чтобы скачать образ из GHCR
+
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Parse lib_deps from platformio.ini (safe for GitHub Actions)
-      - name: Parse lib_deps from platformio.ini
-        id: parse_libs
-        run: |
-          LIBS=$(python3 - <<'PY'
-          import configparser, re
-          cfg = configparser.ConfigParser()
-          cfg.read('platformio.ini')
-          libs = []
-          for section in cfg.sections():
-              if cfg.has_option(section, 'lib_deps'):
-                  raw = cfg.get(section, 'lib_deps')
-                  parts = re.split(r'[,\\n]+', raw)
-                  for p in parts:
-                      p = p.strip()
-                      if p:
-                          libs.append(p)
-          seen = set()
-          out = []
-          for l in libs:
-              if l not in seen:
-                  seen.add(l)
-                  out.append(l.replace('"','').replace("\n",""))
-          print(",".join(out))
-          PY
-          )
-          # Экранируем спецсимволы для GITHUB_OUTPUT
-          LIBS_ESCAPED=${LIBS//'%'/'%25'}
-          LIBS_ESCAPED=${LIBS_ESCAPED//$'\n'/'%0A'}
-          LIBS_ESCAPED=${LIBS_ESCAPED//$'\r'/'%0D'}
-          LIBS_ESCAPED=${LIBS_ESCAPED//'='/'%3D'}
-          echo "libs=$LIBS_ESCAPED" >> $GITHUB_OUTPUT
+      - name: Set lowercase repo path
+        run: echo "REPO_LC=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
-      # 3️⃣ Login to GHCR
       - name: Login to GHCR
-        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # 4️⃣ Pull existing PlatformIO image
-      - name: Pull existing PlatformIO image
+      - name: Pull offline ESP8266 image
+        run: docker pull ghcr.io/$REPO_LC/esp8266-offline:latest
+
+      - name: Compile firmware using offline toolchain
         run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          docker pull $IMAGE_BASE || true
+          docker run --rm \
+            -v ${{ github.workspace }}:/work \
+            -w /work \
+            ghcr.io/$REPO_LC/esp8266-offline:latest \
+            arduino-cli compile \
+              --config-file /arduino-cli.yaml \
+              --fqbn esp8266:esp8266:nodemcuv2 \
+              ./firmware
 
-      # 5️⃣ Preheat libraries and build firmware inside container (root)
-      - name: Preheat libraries and build firmware
-        env:
-          LIBS: ${{ steps.parse_libs.outputs.libs }}
-        run: |
-          IMAGE_BASE=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):latest
-          CONTAINER_NAME=preheat_build
-          docker run -d --name $CONTAINER_NAME -u root \
-            -e PLATFORMIO_CORE_DIR=/platformio \
-            -e PIO_LIB_DIR=/platformio/lib \
-            -e LIBS="$LIBS" \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE_BASE bash -c '
-              set -e
-              echo "LIBS=$LIBS"
-              if [ -n "$LIBS" ]; then
-                for lib in $(echo "$LIBS" | tr "," " "); do
-                  echo "Installing library: $lib"
-                  pio lib install --storage-dir /platformio/lib "$lib" || true
-                done
-              else
-                echo "No libs to install"
-              fi
-              echo "Building project..."
-              pio run || true
-              echo "Done inside container."
-            '
-          docker wait $CONTAINER_NAME
-          echo "Preheat+build finished in container $CONTAINER_NAME"
-
-      # 6️⃣ Commit container as new image
-      - name: Commit container as new image with preheated libraries
-        run: |
-          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
-          CONTAINER_NAME=preheat_build
-          docker commit $CONTAINER_NAME $IMAGE_NEW
-          docker push $IMAGE_NEW
-          docker rm $CONTAINER_NAME
-
-      # 7️⃣ Diagnose cache and test build
-      - name: Diagnose PlatformIO global cache
-        run: |
-          IMAGE_NEW=ghcr.io/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]'):firmware
-          docker run --rm -u root \
-            -e PLATFORMIO_CORE_DIR=/platformio \
-            -e PIO_LIB_DIR=/platformio/lib \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            $IMAGE_NEW bash -c '
-              echo "=== /platformio contents ==="
-              ls -la /platformio || true
-              echo
-              echo "=== /platformio/lib contents ==="
-              ls -la /platformio/lib || echo "/platformio/lib missing"
-              echo
-              echo "=== pio lib list (storage-dir=/platformio/lib) ==="
-              pio lib list --storage-dir /platformio/lib || true
-              echo
-              echo "=== Test build (should succeed) ==="
-              pio run || echo "Build failed"
-            '
-
-      # 8️⃣ Upload firmware artifact
-      - name: Upload firmware artifacts
+      - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: .pio/build/*/*.bin
+          name: esp8266-firmware
+          path: |
+            firmware/build/*
