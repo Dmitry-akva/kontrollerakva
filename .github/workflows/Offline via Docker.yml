@@ -36,10 +36,11 @@ jobs:
               --fqbn esp8266:esp8266:nodemcuv2 \
               --verbose \
               --output-dir /work/_build \
-              ./firmware 2>&1 | tee build-log.txt
+              ./firmware \ 
+             2>&1 | tee build-log.txt
               # Очистка от цветов и лишнего
-              sed -n '/Variables and constants in RAM/,/Used platform/p' build-log.txt \
-                | sed 's/\x1b\[[0-9;]*m//g' > build-log-clean.txt
+            sed -n '/Variables and constants in RAM/,/Used platform/p' build-log.txt \
+              | sed 's/\x1b\[[0-9;]*m//g' > build-log-clean.txt
 
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
