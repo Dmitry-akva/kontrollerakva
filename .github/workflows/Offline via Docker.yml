@@ -1,7 +1,7 @@
 name: Build ESP8266 Firmware (Offline via Docker)
 
 on:
- workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Pull offline ESP8266 image
-        run: docker pull ghcr.io/$REPO_LC/esp8266-offline:latest
+        run: docker pull ghcr.io/${{ env.REPO_LC }}/esp8266-offline:latest
 
       - name: Compile firmware and generate build log
         run: |
@@ -32,36 +32,39 @@ jobs:
             -w /work \
             ghcr.io/${{ env.REPO_LC }}/esp8266-offline:latest \
             bash -c '
-             
+
               LOG=build-log.txt
-      
+              FQBN="esp8266:esp8266:nodemcuv2"
+
               echo "=== Build started ===" > $LOG
               echo "" >> $LOG
-      
-              echo "=== Board configuration used ===" >> $LOG
-              arduino-cli board details --fqbn "$FQBN" | \
-                grep -E "CpuFrequency|FlashSize|Debug|UploadSpeed|FlashFreq|FlashMode" >> $LOG
+
+              echo "=== Board configuration (from arduino-cli.yaml) ===" >> $LOG
+              arduino-cli board details \
+                --config-file /work/arduino-cli.yaml \
+                --fqbn $FQBN | \
+                grep -E "CpuFrequency|FlashSize|Debug|UploadSpeed|FlashFreq|FlashMode" >> $LOG || true
               echo "" >> $LOG
-      
+
               echo "=== Compilation output ===" >> $LOG
               arduino-cli compile \
-                --config-file /arduino-cli.yaml \
-                --fqbn "$FQBN" \
+                --config-file /work/arduino-cli.yaml \
+                --fqbn $FQBN \
                 --output-dir /work/_build \
                 --jobs 4 \
                 ./firmware 2>&1 | tee /tmp/compile.log
-      
+
               cat /tmp/compile.log >> $LOG
               echo "" >> $LOG
-      
+
               echo "=== Memory usage ===" >> $LOG
               grep -E "RAM|IRAM|flash" /tmp/compile.log >> $LOG || true
               echo "" >> $LOG
-      
-              echo "=== Libraries and platform used ===" >> $LOG
+
+              echo "=== Libraries used ===" >> $LOG
               grep -A 20 "Used library" /tmp/compile.log >> $LOG || true
               echo "" >> $LOG
-      
+
               echo "=== Firmware size ===" >> $LOG
               BIN=$(find /work/_build -name "*.bin" | head -n 1)
               if [ -f "$BIN" ]; then
@@ -73,7 +76,7 @@ jobs:
                 echo "Firmware binary not found!" >> $LOG
               fi
               echo "" >> $LOG
-      
+
               echo "=== Build finished ===" >> $LOG
             '
 
@@ -83,7 +86,13 @@ jobs:
           name: esp8266-firmware
           path: _build/*.bin
 
-          # ================= PUSH LOG TO PAGES =================
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build-log.txt
+
+      # ---------- Publish log to GitHub Pages ----------
       - name: Publish build log to gh-pages
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
@@ -91,16 +100,12 @@ jobs:
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
 
-          # Клонируем gh-pages с правами на push
           git clone https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} pages
           cd pages
           git checkout gh-pages || git checkout -b gh-pages
 
-          # Копируем новый лог
           cp ../build-log.txt ./build-log.txt
 
           git add build-log.txt
           git commit -m "Update build log [ci skip]" || echo "No changes"
-
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
-
