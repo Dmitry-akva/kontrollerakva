@@ -1,8 +1,7 @@
 name: Build ESP8266 Firmware (Offline via Docker)
 
 on:
-
-  workflow_dispatch:
+ workflow_dispatch:
 
 jobs:
   build:
@@ -10,7 +9,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: read   # нужно, чтобы скачать образ из GHCR
+      packages: read
 
     steps:
       - name: Checkout repository
@@ -25,20 +24,22 @@ jobs:
       - name: Pull offline ESP8266 image
         run: docker pull ghcr.io/$REPO_LC/esp8266-offline:latest
 
-      - name: Compile firmware using offline toolchain
+      - name: Compile firmware (offline, verbose)
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/work \
             -w /work \
             ghcr.io/$REPO_LC/esp8266-offline:latest \
             arduino-cli compile \
+              
               --config-file /arduino-cli.yaml \
               --fqbn esp8266:esp8266:nodemcuv2 \
+              --verbose \
+              --output-dir /work/build \
               ./firmware
 
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
         with:
           name: esp8266-firmware
-          path: |
-            firmware/build/*
+          path: build/*.bin
