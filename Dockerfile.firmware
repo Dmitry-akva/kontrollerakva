@@ -1,8 +1,0 @@
-ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
-
-# Рабочая директория для проекта
-WORKDIR /workspace
-
-# Команда по умолчанию — просто bash, чтобы можно было заходить внутрь
-CMD ["bash"]
