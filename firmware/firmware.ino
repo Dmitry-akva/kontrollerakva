@@ -3,8 +3,8 @@
 #include <ArduinoOTA.h>   //для ота
 #include <FastBot.h>   // телеграмм бот
 #include <OneWire.h>   // для датчика
-//  #include <DallasTemperature.h>  // для датчика
-//  #include <FileData.h>
+#include <DallasTemperature.h>  // для датчика
+#include <FileData.h>
 #include <LittleFS.h>
 #include <GyverPortal.h>
 #include <GyverHC595.h>
