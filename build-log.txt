@@ -1,8 +1,7 @@
 === Build started ===
 
-=== Board configuration (from arduino-cli.yaml) ===
-Option:        Debug port                                                                                   dbg
-Option:        Debug Level                                                                                  lvl
+=== Board configuration (resolved) ===
+Can't open sketch: main file missing from sketch: /work/work.ino
 
 === Compilation output ===
 . Variables and constants in RAM (global, static), used 32352 / 80192 bytes (40%)
@@ -30,6 +29,6 @@ Option:        Debug Level                                                      
 
 === Firmware size ===
 Binary: /work/_build/firmware.ino.bin
-Size: 549568 bytes ( KB)
+Size: 549568 bytes (536.7 KB)
 
 === Build finished ===
