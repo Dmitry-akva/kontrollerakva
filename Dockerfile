@@ -1,34 +1,51 @@
-FROM python:3.11-slim
+FROM debian:bookworm-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV PLATFORMIO_CORE_DIR=/platformio
-ENV PIO_LIB_DIR=/platformio/lib
-ENV PATH="/root/.local/bin:$PATH"
+ENV ARDUINO_CONFIG_FILE=/arduino-cli.yaml
 
-# Устанавливаем зависимости для PlatformIO и ESP8266
-RUN apt-get update && \
-    apt-get install -y git build-essential ca-certificates curl unzip && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    curl git python3 python3-pip build-essential ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем PlatformIO
-RUN pip install --no-cache-dir platformio
+# --- Arduino CLI ---
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+RUN mv bin/arduino-cli /usr/local/bin/arduino-cli
 
-# Создаём кешевые директории
-RUN mkdir -p /platformio /platformio/lib
+# --- Config ---
+COPY arduino-cli.yaml /arduino-cli.yaml
 
-# Рабочая директория временного проекта для прогрева кеша
-WORKDIR /tmp/project
+# --- Инициализация ---
+RUN arduino-cli config init --overwrite \
+ && arduino-cli config dump
 
-# Копируем конфиг и исходники проекта для прогрева библиотек
-COPY platformio.ini /tmp/project/
-COPY src /tmp/project/src
+# --- Обновляем индексы и ставим ядро ESP8266 ---
+RUN arduino-cli core update-index \
+ && arduino-cli core install esp8266:esp8266
 
-# Прогреваем кеш: тулчейн, платформу, framework и все библиотеки из lib_deps
-RUN env PLATFORMIO_CORE_DIR=/platformio PIO_LIB_DIR=/platformio/lib pio run || true
+# --- Папка для библиотек ---
+WORKDIR /arduino/user/libraries
 
-# Опционально можно удалить исходники временного проекта, оставляем только кеш
-RUN rm -rf /tmp/project
+# --- Установка библиотек из Git ---
+RUN git clone https://github.com/GyverLibs/FastBot.git \
+ && git clone https://github.com/PaulStoffregen/OneWire.git \
+ && git clone https://github.com/milesburton/Arduino-Temperature-Control-Library.git \
+ && git clone https://github.com/GyverLibs/FileData.git \
+ && git clone https://github.com/GyverLibs/GyverPortal.git \
+ && git clone https://github.com/GyverLibs/GyverHC595.git \
+ && git clone https://github.com/GyverLibs/GTimer.git
 
-# Рабочая директория для конечного пользователя контейнера
-WORKDIR /workspace
-CMD ["bash"]
+# --- Копируем тестовый скетч ---
+WORKDIR /build
+COPY sketch /build/sketch
+
+# --- Прогрев кеша компиляции ---
+RUN arduino-cli compile \
+    --fqbn esp8266:esp8266:nodemcuv2 \
+    --build-cache-path /arduino/cache \
+    /build/sketch
+
+# Теперь внутри образа есть:
+# ✔ ядро
+# ✔ тулчейны
+# ✔ библиотеки
+# ✔ кеш компиляции
