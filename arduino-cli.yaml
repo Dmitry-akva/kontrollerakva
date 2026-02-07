@@ -9,3 +9,10 @@ directories:
 
 library:
   enable_unsafe_install: true
+
+sketch:
+  build:
+    fqbn_options:
+      CpuFrequency: 160
+      UploadSpeed: 115200
+      Debug: Disabled
