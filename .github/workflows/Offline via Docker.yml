@@ -36,7 +36,7 @@ jobs:
               --fqbn esp8266:esp8266:nodemcuv2 \
               --verbose \
               --output-dir /work/_build \
-              ./firmware
+              ./firmware 2>&1 | tee build-log.txt
 
 
       - name: Upload compiled firmware
