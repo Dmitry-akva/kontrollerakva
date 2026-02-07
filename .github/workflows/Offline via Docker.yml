@@ -45,3 +45,24 @@ jobs:
           name: esp8266-firmware
           path: _build/*.bin
 
+          # ================= PUSH LOG TO PAGES =================
+      - name: Publish build log to gh-pages
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          # Клонируем gh-pages с правами на push
+          git clone https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} pages
+          cd pages
+          git checkout gh-pages || git checkout -b gh-pages
+
+          # Копируем новый лог
+          cp ../build-log.txt ./build-log.txt
+
+          git add build-log.txt
+          git commit -m "Update build log [ci skip]" || echo "No changes"
+
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }} gh-pages
+
