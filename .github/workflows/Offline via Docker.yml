@@ -37,13 +37,8 @@ jobs:
               --output-dir /work/_build \
               --jobs 4 \
               ./firmware \
-              2>&1 | tee full-build-log.txt
-            sed -i 's/\x1b\[[0-9;]*m//g' full-build-log.txt
-            awk '/Variables and constants in RAM/{flag=1} flag{print}' full-build-log.txt > build-log.txt
-            echo -e "\nUsed libraries:\n" >> build-log.txt
-            grep '^Using library' full-build-log.txt >> build-log.txt
-            echo -e "\nUsed platform:\n" >> build-log.txt
-            grep '^Using platform' full-build-log.txt >> build-log.txt     
+              2>&1 | tee build-log.txt
+            
   
       - name: Upload compiled firmware
         uses: actions/upload-artifact@v4
