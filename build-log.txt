@@ -3,7 +3,7 @@
 === Board configuration used ===
 
 === Compilation output ===
-Error during build: Invalid FQBN: getting build properties for board esp8266:esp8266:nodemcuv2: invalid option 'CpuFrequency'
+Missing FQBN (Fully Qualified Board Name)
 
 === Memory usage ===
 
