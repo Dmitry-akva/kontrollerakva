@@ -24,23 +24,50 @@ jobs:
       - name: Pull offline ESP8266 image
         run: docker pull ghcr.io/$REPO_LC/esp8266-offline:latest
 
-      - name: Compile firmware and save clean log
+      - name: Compile firmware and save full build log
         run: |
           docker run --rm \
             --network none \
             -v ${{ github.workspace }}:/work \
             -w /work \
             ghcr.io/$REPO_LC/esp8266-offline:latest \
-            echo "=== Build started ===" > build-log.txt
-            # Получаем FQBN и опции из arduino-cli
-            arduino-cli board details esp8266:esp8266:nodemcuv2 | tee -a build-log.txt
-            arduino-cli compile \
-              --config-file /arduino-cli.yaml \
-              --fqbn esp8266:esp8266:nodemcuv2 \
-              --output-dir /work/_build \
-              --jobs 4 \
-              ./firmware \
-              2>&1 | tee build-log.txt
+            /bin/bash -c "
+              LOG=/work/build-log.txt
+              echo '=== Build started ===' > \$LOG
+              echo '' >> \$LOG
+      
+              # --- Board details ---
+              echo '=== Board details ===' >> \$LOG
+              arduino-cli board details esp8266:esp8266:nodemcuv2 >> \$LOG
+              echo '' >> \$LOG
+      
+              # --- Compile ---
+              echo '=== Compilation output ===' >> \$LOG
+              arduino-cli compile \
+                --config-file /arduino-cli.yaml \
+                --fqbn esp8266:esp8266:nodemcuv2 \
+                --output-dir /work/_build \
+                --jobs 4 \
+                ./firmware 2>&1 | tee -a \$LOG
+      
+              echo '' >> \$LOG
+      
+              # --- Libraries used ---
+              echo '=== Libraries used ===' >> \$LOG
+              arduino-cli lib list 2>&1 | tee -a \$LOG
+              echo '' >> \$LOG
+      
+              # --- Memory usage ---
+              echo '=== Memory usage ===' >> \$LOG
+              arduino-cli compile \
+                --config-file /arduino-cli.yaml \
+                --fqbn esp8266:esp8266:nodemcuv2 \
+                --output-dir /work/_build \
+                ./firmware --verbose-build-size 2>&1 | grep -E 'Used|Code in flash' | tee -a \$LOG
+      
+              echo '=== Build finished ===' >> \$LOG
+            "
+
             
   
       - name: Upload compiled firmware
