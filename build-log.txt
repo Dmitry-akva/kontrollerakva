@@ -1,15 +1,35 @@
 === Build started ===
 
-=== Board configuration used ===
+=== Board configuration (from arduino-cli.yaml) ===
+Option:        Debug port                                                                                   dbg
+Option:        Debug Level                                                                                  lvl
 
 === Compilation output ===
-Missing FQBN (Fully Qualified Board Name)
+. Variables and constants in RAM (global, static), used 32352 / 80192 bytes (40%)
+║   SEGMENT  BYTES    DESCRIPTION
+╠══ DATA     1520     initialized variables
+╠══ RODATA   3312     constants       
+╚══ BSS      27520    zeroed variables
+. Instruction RAM (IRAM_ATTR, ICACHE_RAM_ATTR), used 61279 / 65536 bytes (93%)
+║   SEGMENT  BYTES    DESCRIPTION
+╠══ ICACHE   32768    reserved space for flash instruction cache
+╚══ IRAM     28511    code in IRAM    
+. Code in flash (default, ICACHE_FLASH_ATTR), used 512072 / 1048576 bytes (48%)
+║   SEGMENT  BYTES    DESCRIPTION
+╚══ IROM     512072   code in flash   
 
 === Memory usage ===
+. Variables and constants in RAM (global, static), used 32352 / 80192 bytes (40%)
+. Instruction RAM (IRAM_ATTR, ICACHE_RAM_ATTR), used 61279 / 65536 bytes (93%)
+╠══ ICACHE   32768    reserved space for flash instruction cache
+╚══ IRAM     28511    code in IRAM    
+. Code in flash (default, ICACHE_FLASH_ATTR), used 512072 / 1048576 bytes (48%)
+╚══ IROM     512072   code in flash   
 
-=== Libraries and platform used ===
+=== Libraries used ===
 
 === Firmware size ===
-Firmware binary not found!
+Binary: /work/_build/firmware.ino.bin
+Size: 549568 bytes ( KB)
 
 === Build finished ===
