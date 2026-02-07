@@ -1,35 +1,15 @@
 === Build started ===
 
-=== Board details ===
+=== Board configuration used ===
 
 === Compilation output ===
-. Variables and constants in RAM (global, static), used 32352 / 80192 bytes (40%)
-║   SEGMENT  BYTES    DESCRIPTION
-╠══ DATA     1520     initialized variables
-╠══ RODATA   3312     constants       
-╚══ BSS      27520    zeroed variables
-. Instruction RAM (IRAM_ATTR, ICACHE_RAM_ATTR), used 61279 / 65536 bytes (93%)
-║   SEGMENT  BYTES    DESCRIPTION
-╠══ ICACHE   32768    reserved space for flash instruction cache
-╚══ IRAM     28511    code in IRAM    
-. Code in flash (default, ICACHE_FLASH_ATTR), used 512072 / 1048576 bytes (48%)
-║   SEGMENT  BYTES    DESCRIPTION
-╚══ IROM     512072   code in flash   
-
-=== Libraries used ===
-Name              Installed Available Location Description
-DallasTemperature 4.0.5     -         user     -
-FastBot           2.27.3    -         user     -
-FileData          1.0.3     -         user     -
-GTimer            1.1.1     -         user     -
-GyverHC595        1.2       -         user     -
-GyverPortal       3.6.6     -         user     -
-OneWire           2.3.8     -         user     -
-
+Error during build: Invalid FQBN: getting build properties for board esp8266:esp8266:nodemcuv2: invalid option 'CpuFrequency'
 
 === Memory usage ===
-      --encrypt-key string                    The name of the custom encryption key to use to encrypt a binary during the compile process. Used only by the platforms that support it.
-      --keys-keychain string                  The path of the dir to search for the custom keys to sign and encrypt a binary. Used only by the platforms that support it.
-      --sign-key string                       The name of the custom signing key to use to sign a binary during the compile process. Used only by the platforms that support it.
-      --warnings string                       Optional, can be: none, default, more, all. Used to tell gcc which warning level to use (-W flag). (default "none")
+
+=== Libraries and platform used ===
+
+=== Firmware size ===
+Firmware binary not found!
+
 === Build finished ===
