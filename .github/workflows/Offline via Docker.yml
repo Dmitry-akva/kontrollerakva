@@ -24,7 +24,7 @@ jobs:
       - name: Pull offline ESP8266 image
         run: docker pull ghcr.io/${{ env.REPO_LC }}/esp8266-offline:latest
 
-      - name: Compile firmware and generate build log
+      - name: Compile firmware and generate clean build log
         run: |
           docker run --rm \
             --network none \
@@ -32,51 +32,54 @@ jobs:
             -w /work \
             ghcr.io/${{ env.REPO_LC }}/esp8266-offline:latest \
             bash -c '
-              FQBN="esp8266:esp8266:nodemcuv2"
               LOG=build-log.txt
-
+      
+              # Начало лога
               echo "=== Build started ===" > $LOG
               echo "" >> $LOG
-
-              echo "=== Board configuration (resolved) ===" >> $LOG
-              arduino-cli compile \
-                --config-file /work/arduino-cli.yaml \
-                --fqbn "$FQBN" \
-                --show-properties 2>&1 \
-                | sed "s/\x1b\[[0-9;]*m//g" >> $LOG || true
+      
+              # Параметры платы (из arduino-cli.yaml)
+              echo "=== Board configuration (from arduino-cli.yaml) ===" >> $LOG
+              arduino-cli board details --fqbn esp8266:esp8266:nodemcuv2 | \
+                grep -E "CpuFrequency|FlashSize|Debug|UploadSpeed|FlashFreq|FlashMode" >> $LOG
               echo "" >> $LOG
-
+      
+              # Компиляция
               echo "=== Compilation output ===" >> $LOG
               arduino-cli compile \
-                --config-file /work/arduino-cli.yaml \
-                --fqbn "$FQBN" \
+                --config-file /arduino-cli.yaml \
+                --fqbn esp8266:esp8266:nodemcuv2 \
                 --output-dir /work/_build \
                 --jobs 4 \
                 ./firmware 2>&1 | tee /tmp/compile.log
-
-              sed "s/\x1b\[[0-9;]*m//g" /tmp/compile.log >> $LOG
+      
+              # Добавляем лог компиляции
+              cat /tmp/compile.log >> $LOG
               echo "" >> $LOG
-
+      
+              # Память
               echo "=== Memory usage ===" >> $LOG
-              grep -E "RAM|IRAM|flash" /tmp/compile.log >> $LOG || true
+              grep -E "Variables and constants in RAM|Instruction RAM|Code in flash" /tmp/compile.log >> $LOG || true
               echo "" >> $LOG
-
+      
+              # Используемые библиотеки
               echo "=== Libraries used ===" >> $LOG
-              grep -A 20 "Used library" /tmp/compile.log >> $LOG || true
+              grep -E "^Using library" /tmp/compile.log | sed "s/\x1b\[[0-9;]*m//g" >> $LOG || true
               echo "" >> $LOG
-
+      
+              # Размер прошивки
               echo "=== Firmware size ===" >> $LOG
               BIN=$(find /work/_build -name "*.bin" | head -n 1)
               if [ -f "$BIN" ]; then
                 SIZE=$(stat -c%s "$BIN")
-                KB=$(awk "BEGIN {printf \"%.1f\", $SIZE/1024}")
+                KB=$(echo "scale=1; $SIZE/1024" | bc)
                 echo "Binary: $BIN" >> $LOG
                 echo "Size: $SIZE bytes ($KB KB)" >> $LOG
               else
                 echo "Firmware binary not found!" >> $LOG
               fi
               echo "" >> $LOG
-
+      
               echo "=== Build finished ===" >> $LOG
             '
 
