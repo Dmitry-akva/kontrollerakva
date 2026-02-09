@@ -103,6 +103,15 @@ jobs:
           git checkout gh-pages || git checkout -b gh-pages
 
           cp ../build-log.txt ./build-log.txt
+
+          # Копируем прошивку
+          BIN=$(find ../_build -name "*.bin" | head -n 1)
+          if [ -f "$BIN" ]; then
+            cp "$BIN" ./firmware.bin
+            echo "Firmware copied: $BIN"
+          else
+            echo "Firmware binary not found!"
+          fi
         
           git add build-log.txt
           git commit -m "Update build log [ci skip]" || echo "No changes"
